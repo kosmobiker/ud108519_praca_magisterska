@@ -1,3 +1,5 @@
-# here it will be my master thesis
-this is a my repo
+# sgh-diploma
+this is a my diplomas repo
 
+*testing of git*
+**works**
