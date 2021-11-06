@@ -1,2 +1,3 @@
-# sgh-diploma
-this is a my diplomas repo
+# here it will be my master thesis
+this is a my repo
+
