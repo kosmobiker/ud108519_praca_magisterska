@@ -3,7 +3,7 @@
 __pycache__/
 *.py[cod]
 *$py.class
-
+api_token.ini
 # C extensions
 *.so
 
@@ -12,6 +12,7 @@ __pycache__/
 build/
 develop-eggs/
 dist/
+data/
 downloads/
 eggs/
 .eggs/
