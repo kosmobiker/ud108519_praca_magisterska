@@ -12,11 +12,12 @@ import requests
 import pandas as pd
 from datetime import datetime 
 from ratelimit import limits, sleep_and_retry
-from utils.utils import simple_request, check_limit
+from utils.utils import read_config, simple_request, check_limit
 
-BASE_URL = 'https://api.coingecko.com/api/v3/'
-CALLS = 50
-RATE_LIMIT = 60
+CONFIG_PATH = "C:\\Users\\Vlad\\Documents\\mastesis\\config\\cofig.yaml"
+configs_dict = read_config(CONFIG_PATH)
+BASE_URL = configs_dict["baseUrl"]
+PATH_TO_SAVE = configs_dict["path_to_save_historical_data"]
 
 def get_historical_data(coin: str):
     check_limit()
@@ -27,17 +28,16 @@ def get_historical_data(coin: str):
     except:
         print("Didn't fetch {}".format(coin))
 
-if __name__ == "__main__":
+def get_all_historical():
     print(datetime.now())
     print('start!')
     full_list = simple_request('coins/list')
-    names_of_coins = [item['id'] for item in  full_list]
-    sampled_list = random.sample(names_of_coins, 100)
-    path_to_save = '../data/historical'
-    for coin in sampled_list:
+    names_of_coins = [item['id'] for item in full_list]
+    for coin in names_of_coins[5555:5655]:
         tmp = get_historical_data(coin)
-        with open('{}/{}_historical_prices.json'.format(path_to_save, coin), 'w') as f:
+        with open('{}/{}_historical_prices.json'.format(PATH_TO_SAVE, coin), 'w') as f:
             json.dump(tmp, f)
         print('{} is uploaded'.format(coin))
     print('done!')
 
+get_all_historical()
