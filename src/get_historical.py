@@ -11,19 +11,15 @@ import time
 import requests
 import pandas as pd
 from datetime import datetime 
-from ratelimit import limits
-from backoff import on_exception, expo
+from ratelimit import limits, sleep_and_retry
+from utils.utils import simple_request, check_limit
 
 BASE_URL = 'https://api.coingecko.com/api/v3/'
-ONE_MINUTE = 60
+CALLS = 50
+RATE_LIMIT = 60
 
-def simple_request(req):
-    api_url = BASE_URL + req
-    raw = requests.get(api_url).json()
-    return raw 
-
-@limits(calls=40, period=ONE_MINUTE)
 def get_historical_data(coin: str):
+    check_limit()
     try:
         req = BASE_URL + 'coins/{}/market_chart?vs_currency=USD&days=max&interval=daily'.format(coin)
         res = requests.get(req).json()
@@ -36,7 +32,7 @@ if __name__ == "__main__":
     print('start!')
     full_list = simple_request('coins/list')
     names_of_coins = [item['id'] for item in  full_list]
-    sampled_list = random.sample(names_of_coins, 1000)
+    sampled_list = random.sample(names_of_coins, 100)
     path_to_save = '../data/historical'
     for coin in sampled_list:
         tmp = get_historical_data(coin)
