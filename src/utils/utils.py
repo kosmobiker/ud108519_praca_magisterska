@@ -5,15 +5,17 @@ import json
 import os
 import random
 import time
-import confuse
 import requests
 import pandas as pd
 import yaml
 from datetime import datetime 
 from ratelimit import limits, sleep_and_retry
+import logger
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = "C:\\Users\\Vlad\\Documents\\mastesis\\config\\cofig.yaml"
+CONFIG_PATH = "/home/vlad/master_project/config/cofig.yaml"
+log = logger.get_logger(__name__)
+
 
 def read_config(path: str):
     """
@@ -23,7 +25,7 @@ def read_config(path: str):
         try:
             return yaml.safe_load(conf)
         except yaml.YAMLError as exc:
-            print(exc)
+            log.error(exc)
 
 configs_dict = read_config(CONFIG_PATH)
 BASE_URL = configs_dict["baseUrl"]
