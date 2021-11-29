@@ -10,11 +10,12 @@ import pandas as pd
 import yaml
 from datetime import datetime 
 from ratelimit import limits, sleep_and_retry
-import logger
+from utils.logger import get_logger
+
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = "/home/vlad/master_project/config/cofig.yaml"
-log = logger.get_logger(__name__)
+log = get_logger(__name__)
 
 
 def read_config(path: str):
