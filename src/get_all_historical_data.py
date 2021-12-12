@@ -1,5 +1,5 @@
 """
-This is used to get all historical data
+This is used to get historical data
 from the Coingecko API
 
 test_conenction >> get_list_of_coins >> get_historical_data
@@ -37,7 +37,7 @@ def get_historical_data(coin: str):
     except:
         pass
 
-def get_all_historical():
+def get_all_historical_data():
     log.info('Starting to upload historical data for cryptocurrencies!')
     full_list = simple_request('coins/list')
     names_of_coins = [item['id'] for item in full_list][:200] # for debug purposes
@@ -53,5 +53,3 @@ def get_all_historical():
             pass
     log.info('Historical data for cryptocurrency is uploaded')
 
-if __name__ == '__main__':
-    get_all_historical()
