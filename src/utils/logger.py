@@ -8,7 +8,13 @@ APP_LOGGER_NAME = 'MyAwesomeApp'
 
 def setup_applevel_logger(logger_name = APP_LOGGER_NAME, file_name=None):
     """
-    this is a docstring
+    This function is used for logging. It saves the logs
+    into the log files in appropriate folder.
+    Default log level is *DEBUG*
+
+    Parameters:
+        logger_name (str): name of the app used in logging
+        file_name (str): path for logfiles
     """ 
     logger = logging.getLogger(logger_name)
     logger.setLevel(logging.DEBUG)
@@ -25,6 +31,7 @@ def setup_applevel_logger(logger_name = APP_LOGGER_NAME, file_name=None):
 
 def get_logger(module_name):
     """
-    this is a test
+    It is used when there is a need to embed the logging
+    int the function
     """    
     return logging.getLogger(APP_LOGGER_NAME).getChild(module_name)

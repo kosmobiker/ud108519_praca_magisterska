@@ -1,5 +1,0 @@
----
-  baseUrl: "https://api.coingecko.com/api/v3/"
-  calls: 50
-  rateLimit: 60
-  path_to_save_historical_data: '../data/historical' 

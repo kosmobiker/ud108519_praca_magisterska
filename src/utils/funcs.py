@@ -10,28 +10,17 @@ import pandas as pd
 import yaml
 from datetime import datetime 
 from ratelimit import limits, sleep_and_retry
-from utils.logger import get_logger
+from logger import get_logger
+from read_config import read_config
 
-
-ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
-CONFIG_PATH = "/home/vlad/master_project/config/cofig.yaml"
 log = get_logger(__name__)
-
-
-def read_config(path: str):
-    """
-    It is used to read configs
-    """
-    with open(CONFIG_PATH, "r") as conf:
-        try:
-            return yaml.safe_load(conf)
-        except yaml.YAMLError as exc:
-            log.error(exc)
-
+ROOT_DIR = os.path.dirname(__file__)
+CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, '..', '..', 'config/config.yaml'))
 configs_dict = read_config(CONFIG_PATH)
 BASE_URL = configs_dict["baseUrl"]
 CALLS = configs_dict["calls"]
 RATE_LIMIT = configs_dict["rateLimit"]
+
 
 @sleep_and_retry
 @limits(calls=CALLS, period=RATE_LIMIT)
@@ -47,4 +36,5 @@ def simple_request(req: str):
     """
     api_url = BASE_URL + req
     raw = requests.get(api_url).json()
-    return raw 
+    return raw
+ 
