@@ -31,7 +31,7 @@ def setup_applevel_logger(logger_name = APP_LOGGER_NAME, file_name=None):
 
 def get_logger(module_name):
     """
-    It is used when there is a need to embed the logging
-    int the function
+    It is used when there is a need to 
+    embed the logging into the function
     """    
     return logging.getLogger(APP_LOGGER_NAME).getChild(module_name)
