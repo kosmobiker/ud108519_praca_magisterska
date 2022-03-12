@@ -7,3 +7,7 @@ dob = 1991-01-28
 [dev]
 api_endpoint = "https://api.coingecko.com/api/v3"
 path_coin_list = "data/coin_list"
+path_raw_data = "data/raw"
+
+
+
