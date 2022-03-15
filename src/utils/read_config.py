@@ -8,7 +8,7 @@ from utils.logger import get_logger
 
 log = get_logger(__name__)
 
-def read_config(path: str) -> dict:
+def read_yaml_config(path: str) -> dict:
     """
     This function is used to read config
     constants from yaml files.

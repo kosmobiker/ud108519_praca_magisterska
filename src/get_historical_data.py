@@ -37,17 +37,21 @@ def save_raw_json(data, coin: str):
         json.dump(data, f)
 
 if __name__ == "__main__":
-    if not os.path.exists(PATH_RAW_DATA):
-        os.makedirs(PATH_RAW_DATA)
-        log.info("{} was created".format(PATH_RAW_DATA))
-    for coin in list_of_coins:
-        try:
-            result = get_historical_data(coin)
-            save_raw_json(result, coin)
-            log.info("{} - raw json file was saved".format(coin))
-        except Exception as err:
-            log.error("{} - raw json file was noot save, see details".format(coin), err)
-    log.info('Upload of raw json files is complete')
+    MODE = 'cloud'
+    if MODE == 'local':
+        if not os.path.exists(PATH_RAW_DATA):
+            os.makedirs(PATH_RAW_DATA)
+            log.info("{} was created".format(PATH_RAW_DATA))
+        for coin in list_of_coins:
+            try:
+                result = get_historical_data(coin)
+                save_raw_json(result, coin)
+                log.info("{} - raw json file was saved".format(coin))
+            except Exception as err:
+                log.error("{} - raw json file was not save, see details".format(coin), err)
+        log.info('Uploading of raw json files is complete')
+    else:
+
             
 
 

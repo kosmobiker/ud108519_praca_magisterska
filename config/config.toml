@@ -9,6 +9,8 @@ api_endpoint = "https://api.coingecko.com/api/v3"
 path_coin_list = "data/coin_list"
 path_raw_data = "data/raw"
 path_to_logs = "logs/"
+path_to_datalake = "data/datalake"
+
 
 
 

@@ -1,5 +1,7 @@
 import os
 import json
+import boto3
+from io import StringIO
 from typing import List
 
 import pandas as pd
@@ -9,6 +11,7 @@ from datetime import datetime
 from utils.read_config import read_toml_config
 from utils.call_get import call_get
 from utils.logger import setup_applevel_logger
+from utils.aws_utils import create_bucket, upload_file
 
 
 ROOT_DIR = os.path.dirname(__file__)
@@ -31,13 +34,11 @@ def get_coin_list() -> List[str]:
     ]
 
 if __name__ == "__main__":
-    if not os.path.exists(PATH_COIN_LIST):
-        os.makedirs(PATH_COIN_LIST)
-        log.info("{} was created".format(PATH_COIN_LIST))
-    try:
-        pd.json_normalize(get_coin_list()).to_csv(PATH_COIN_LIST + '/list_of_coins.csv')
-        log.info('List of coins was uploaded to data lake')
-    except Exception as err:
-        log.error('List of coins was not uploaded to data lake. More info:', err)
+    # try:
+    #     pd.json_normalize(get_coin_list()).to_csv(PATH_COIN_LIST + '/list_of_coins.csv')
+    #     log.info('List of coins was uploaded to data lake')
+    # except Exception as err:
+    #     log.error('List of coins was not uploaded to data lake. More info:', err)
     #it will be a function to create a hive table with list of coins
-
+    try:
+        #    use aws data wrangler
