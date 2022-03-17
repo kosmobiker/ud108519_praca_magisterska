@@ -20,18 +20,19 @@ PATH_TO_DATALAKE = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['p
 
 
 if __name__ == "__main__":
-    try:
-        if not os.path.exists(PATH_TO_LOGS):
-            os.makedirs(PATH_TO_LOGS)
-        log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
-        if not os.path.exists(PATH_COIN_LIST):
-            os.makedirs(PATH_COIN_LIST)
-        if not os.path.exists(PATH_RAW_DATA):
-            os.makedirs(PATH_RAW_DATA)
-        if not os.path.exists(PATH_TO_DATALAKE):
-            os.makedirs(PATH_TO_DATALAKE)
-        assert requests.get(API_ENDPOINT / "ping").status_code == 200
-        log.info('Everything is OK')
-    except Exception as err:
-        log.info('Something is wrong')
-        log.error(err)
+    # try:
+    #     if not os.path.exists(PATH_TO_LOGS):
+    #         os.makedirs(PATH_TO_LOGS)
+    #     log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
+    #     if not os.path.exists(PATH_COIN_LIST):
+    #         os.makedirs(PATH_COIN_LIST)
+    #     if not os.path.exists(PATH_RAW_DATA):
+    #         os.makedirs(PATH_RAW_DATA)
+    #     if not os.path.exists(PATH_TO_DATALAKE):
+    #         os.makedirs(PATH_TO_DATALAKE)
+    #     assert requests.get(API_ENDPOINT / "ping").status_code == 200
+    #     log.info('Everything is OK')
+    # except Exception as err:
+    #     log.info('Something is wrong')
+    #     log.error(err)
+    
