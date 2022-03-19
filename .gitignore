@@ -9,6 +9,7 @@ api_token.ini
 
 # Distribution / packaging
 .Python
+src/lambda/package/
 build/
 develop-eggs/
 dist/
