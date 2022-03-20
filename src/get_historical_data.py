@@ -52,10 +52,10 @@ if __name__ == "__main__":
     #             log.error("{} - raw json file was not save, see details".format(coin), err)
     #     log.info('Uploading of raw json files is complete')
     # else:
-    session = boto3.Session(profile_name='default')
-    # session = boto3.Session(profile_name=AWS_PROFILE)
+    #session = boto3.Session(profile_name='default')
+    session = boto3.Session(profile_name=AWS_PROFILE)
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[10:25] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[20:30] #for test only
     for coin in list_of_coins:
         try:
             result = get_historical_data(coin)

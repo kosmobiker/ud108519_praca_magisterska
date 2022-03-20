@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-API_ENDPOINT = "https://api.coingecko.com/api/v3"
+API_ENDPOINT = URL("https://api.coingecko.com/api/v3")
 
 @retry(
     retry=retry_if_exception_type(requests.exceptions.RequestException),
