@@ -1,3 +1,7 @@
+"""
+this is a lambda function used to get historical data of cryptocurrencies.
+API of coingecko is limited: it allows to call only 50 requests/minute
+"""
 import json
 import requests
 import boto3
