@@ -1,0 +1,74 @@
+{
+	"definitions": {},
+	"$schema": "http://json-schema.org/draft-07/schema#", 
+	"$id": "https://example.com/object1647977212.json", 
+	"title": "Root", 
+	"type": "object",
+	"required": [
+		"prices",
+		"market_caps",
+		"total_volumes"
+	],
+	"properties": {
+		"prices": {
+			"$id": "#root/prices", 
+			"title": "Prices", 
+			"type": "array",
+			"default": [],
+			"items":{
+				"$id": "#root/prices/items", 
+				"title": "Items", 
+				"type": "array",
+				"default": [],
+				"items":{
+					"$id": "#root/prices/items/items", 
+					"title": "Items", 
+					"type": "number",
+          "maxItems": 2,
+          "minimum": 0,
+					"default": 10.0
+				}
+			}
+		},
+		"market_caps": {
+			"$id": "#root/market_caps", 
+			"title": "Market_caps", 
+			"type": "array",
+			"default": [],
+			"items":{
+				"$id": "#root/market_caps/items", 
+				"title": "Items", 
+				"type": "array",
+				"default": [],
+				"items":{
+					"$id": "#root/market_caps/items/items", 
+					"title": "Items", 
+					"type": "integer",
+          "maxItems": 2,
+          "minimum": 0,
+					"default": 10
+				}
+			}
+		},
+		"total_volumes": {
+			"$id": "#root/total_volumes", 
+			"title": "Total_volumes", 
+			"type": "array",
+			"default": [],
+			"items":{
+				"$id": "#root/total_volumes/items", 
+				"title": "Items", 
+				"type": "array",
+				"default": [],
+				"items":{
+					"$id": "#root/total_volumes/items/items", 
+					"title": "Items", 
+					"type": "number",
+          "maxItems": 2,
+          "minimum": 0,
+					"default": 10
+				}
+			}
+		}
+	}
+}
