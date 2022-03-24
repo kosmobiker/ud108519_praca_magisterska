@@ -62,7 +62,7 @@ if __name__ == "__main__":
     session = boto3.Session(profile_name=AWS_PROFILE)
     lambda_client = session.client('lambda')
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[666:777] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1000:1500] #for test only
     params = {
             "bucket": AWS_BUCKET,
             "path_raw_data": PATH_RAW_DATA
