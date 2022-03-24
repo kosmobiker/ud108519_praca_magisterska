@@ -36,23 +36,22 @@ AWS_BUCKET = config['dev']['aws_bucket']
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
 
-
 session = boto3.Session(profile_name=AWS_PROFILE)
 
-def get_list_of_objects_s3(session, bucket):
+with open('/home/vlad/master_project/config/schema.json') as f:
+    schema = json.load(f)
+
+def get_list_of_objects_s3(session, operation_parameters):
     """
     List files in specific S3 URL
     """
     s3 = session.client('s3')
     paginator = s3.get_paginator('list_objects_v2')
-    page_iterator = paginator.paginate(Bucket=bucket)
+    page_iterator = paginator.paginate(**operation_parameters)
     for page in page_iterator:
         for content in page.get('Contents'):
             yield content.get('Key')
 
-
-with open('/home/vlad/master_project/config/schema.json') as f:
-    schema = json.load(f)
 
 def validate_json(data, schema):
     try:
@@ -67,15 +66,14 @@ def get_json_from_s3(session, bucket, key):
     data = obj['Body'].read().decode('utf-8')
     return json.loads(data)
 
-def data_validation(session, bucket, schema):
+def data_validation(session, params, schema):
     good_pathes = []
     bad_pathes = []
     dubious_pathes = []
-    gen = get_list_of_objects_s3(session, bucket)
-    for _ in gen:
+    gen = get_list_of_objects_s3(session, params)
+    for key in gen:
         try:
-            key = next(gen)
-            data = get_json_from_s3(session, bucket, key)
+            data = get_json_from_s3(session, params["Bucket"], key)
             if len(data['prices']) < 100:
                 bad_pathes.append(key)
                 log.info(f"{key} is too short")
@@ -94,7 +92,11 @@ def data_validation(session, bucket, schema):
     return good_pathes, bad_pathes, dubious_pathes
 
 if __name__ == "__main__":
-    g, b, d = data_validation(session, AWS_BUCKET, schema)
+    params = {
+        'Bucket' : AWS_BUCKET,
+        'Prefix' : PATH_RAW_DATA
+    }
+    g, b, d = data_validation(session, params, schema)
     log.info(f"Number of good files is {len(g)}")
     log.info(f"Number of bad files is {len(b)}")
     log.info(f"Number of dubious files is {len(d)}")
