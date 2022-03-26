@@ -41,4 +41,3 @@ def read_toml_config(path: str) -> dict:
             return toml.load(conf)
         except Exception as err:
             log.error(err)
-

@@ -12,8 +12,3 @@ path_to_logs = "logs/"
 path_to_datalake = "data/datalake"
 aws_profile = "master"
 aws_bucket = "kosmobiker-masterproject"
-
-
-
-
-

@@ -19,15 +19,18 @@ import os
 import json
 import boto3
 from jsonschema import validate
+from pprint import pprint
 from utils.read_config import read_toml_config
 from datetime import datetime
+from decimal import Decimal
 from utils.logger import setup_applevel_logger
+from utils.aws_utils import dynamo_put_item, dynamo_get_item
 
 
 ROOT_DIR = os.path.dirname(__file__)
 CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, '..', 'config', 'config.toml'))
-
 config = read_toml_config(CONFIG_PATH)
+print(config)
 PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_to_logs']))
 TODAY = datetime.today().strftime("%Y%m%d")
 PATH_RAW_DATA = config['dev']['path_raw_data']
@@ -38,8 +41,8 @@ log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODA
 
 session = boto3.Session(profile_name=AWS_PROFILE)
 
-with open('/home/vlad/master_project/config/schema.json') as f:
-    schema = json.load(f)
+# with open('/home/vlad/master_project/config/schema.json') as f:
+#     schema = json.load(f)
 
 def get_list_of_objects_s3(session, operation_parameters):
     """
@@ -92,6 +95,12 @@ def data_validation(session, params, schema):
     return good_pathes, bad_pathes, dubious_pathes
 
 if __name__ == "__main__":
+    key = {
+        'SchemaName' : 'u.darhevich-schema',
+        'SchemaVersion' : '0.2-test',
+    }
+    response = dynamo_get_item(session, "Schemas", key)['schema_body']
+    schema = json.loads(response)
     params = {
         'Bucket' : AWS_BUCKET,
         'Prefix' : PATH_RAW_DATA
@@ -100,3 +109,9 @@ if __name__ == "__main__":
     log.info(f"Number of good files is {len(g)}")
     log.info(f"Number of bad files is {len(b)}")
     log.info(f"Number of dubious files is {len(d)}")
+    # body = {
+    #     'SchemaName' : 'u.darhevich-schema',
+    #     'SchemaVersion' : '0.2-test',
+    #     'schema_body': json.dumps(schema)
+    # }
+    # dynamo_put_item(session, "Schemas", body)
