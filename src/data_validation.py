@@ -19,12 +19,11 @@ import os
 import json
 import boto3
 from jsonschema import validate
-from pprint import pprint
-from utils.read_config import read_toml_config
 from datetime import datetime
 from decimal import Decimal
+from utils.read_config import read_toml_config
 from utils.logger import setup_applevel_logger
-from utils.aws_utils import dynamo_put_item, dynamo_get_item
+from utils.aws_utils import dynamo_put_item, dynamo_get_item, get_json_s3
 
 
 ROOT_DIR = os.path.dirname(__file__)
@@ -35,13 +34,14 @@ TODAY = datetime.today().strftime("%Y%m%d")
 PATH_RAW_DATA = config['dev']['path_raw_data']
 AWS_PROFILE = config['dev']['aws_profile']
 AWS_BUCKET = config['dev']['aws_bucket']
-log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
+SCHEMA_NAME = config['dev']['schema_name']
+SCHEMA_VERSION = config['dev']['schema_version']
 
+log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
 session = boto3.Session(profile_name=AWS_PROFILE)
 dynamo = session.resource('dynamodb')
 s3_client = session.client('s3')
-
 
 # with open('/home/vlad/master_project/config/schema.json') as f:
 #     schema = json.load(f)
@@ -58,29 +58,27 @@ def get_list_of_objects_s3(operation_parameters, s3=None):
         for content in page.get('Contents'):
             yield content.get('Key')
 
-
 def validate_json(data, schema):
+    """
+    Validation of JSON file according to schema
+    """
     try:
         validate(instance=data, schema=schema)
         return True
     except Exception:
         return False
 
-def get_json_from_s3(bucket, key, s3=None):
-    if not s3:
-        s3 = boto3.client('s3')
-    obj = s3.get_object(Bucket=bucket, Key=key)
-    data = obj['Body'].read().decode('utf-8')
-    return json.loads(data)
-
-def data_validation(params, schema):
+def data_validation(params: dict, schema):
+    """
+    Main function for data validation
+    """
     good = 0
     bad = 0
     dubious = 0
-    gen = get_list_of_objects_s3(params, s3_client)
+    gen = get_list_of_objects_s3(params, s3_client) #generator
     for key in gen:
         try:
-            data = get_json_from_s3(params["Bucket"], key, s3_client)
+            data = get_json_s3(params["Bucket"], key, s3_client)
             if len(data['prices']) < 100:
                 dynamo_params = {
                     'Path' : key,
@@ -138,8 +136,8 @@ def data_validation(params, schema):
 
 if __name__ == "__main__":
     key = {
-        'SchemaName' : 'u.darhevich-schema',
-        'SchemaVersion' : '0.2-test',
+        'SchemaName' : SCHEMA_NAME,
+        'SchemaVersion' : SCHEMA_VERSION
     }
     response = dynamo_get_item("Schemas", key, dynamo)['schema_body']
     schema = json.loads(response)

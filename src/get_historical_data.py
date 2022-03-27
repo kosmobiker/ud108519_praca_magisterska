@@ -1,17 +1,18 @@
+"""
+This module is used to get historical data
+from list of coins provided by API
+"""
 import os
 import json
 from typing import List
 import awswrangler as wr
-import pandas as pd
 import boto3
-import pandas as pd
 from tenacity import *
 from yarl import URL
 from datetime import datetime
 from utils.read_config import read_toml_config
 from utils.call_get import call_get
 from utils.logger import setup_applevel_logger
-from utils.aws_utils import upload_json_s3
 
 
 ROOT_DIR = os.path.dirname(__file__)
@@ -25,6 +26,7 @@ PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_
 TODAY = datetime.today().strftime("%Y%m%d")
 AWS_PROFILE = config['dev']['aws_profile']
 AWS_BUCKET = config['dev']['aws_bucket']
+LAMBA_FUNC = config['dev']['lambda_func_name']
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
@@ -33,6 +35,13 @@ s3_client = session.client('s3')
 lambda_client = session.client('lambda')
 
 def get_historical_data(id: str) -> List[str]:
+    """
+    Function used to get historical data for each coin
+    Params
+        id: str name of the coin
+    Return
+        List with strings
+    """
     return json.loads(
             call_get(API_ENDPOINT / "coins" / id / "market_chart", {"vs_currency" : "usd", "days" : "max"})
         )
@@ -42,6 +51,10 @@ def get_historical_data(id: str) -> List[str]:
 #         json.dump(data, f)
 
 def lambda_get_data(func_name: str, params: dict, client=None):
+    """
+    Function used to invoke lambda function
+    with various parameters
+    """
     if not client:
         client = boto3.client('lambda')
     response = client.invoke(
@@ -51,29 +64,13 @@ def lambda_get_data(func_name: str, params: dict, client=None):
         )
     return response
 
-if __name__ == "__main__":
-    #     if not os.path.exists(PATH_RAW_DATA):
-    #         os.makedirs(PATH_RAW_DATA)
-    #         log.info("{} was created".format(PATH_RAW_DATA))
-    #     for coin in list_of_coins:
-    #         try:
-    #             result = get_historical_data(coin)
-    #             save_raw_json(result, coin)
-    #             log.info("{} - raw json file was saved".format(coin))
-    #         except Exception as err:
-    #             log.error("{} - raw json file was not save, see details".format(coin), err)
-    #     log.info('Uploading of raw json files is complete')
-    # else:
-    #session = boto3.Session(profile_name='default')
-    
+if __name__ == "__main__":  
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1500:1600] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1600:1666] #for test only
     params = {
             "bucket": AWS_BUCKET,
             "path_raw_data": PATH_RAW_DATA
         }
-    func = 'Kosmo_Test_Lambda_Function'
-
     for coin in list_of_coins:
         # try:
         #     result = get_historical_data(coin)
@@ -85,7 +82,7 @@ if __name__ == "__main__":
         #     log.error(err)
         try:
             params['coin'] = coin
-            lambda_get_data(func, params, lambda_client)
+            lambda_get_data(LAMBA_FUNC, params, lambda_client)
             log.info(f"{coin} - raw json file was saved")
         except Exception as err:
             log.error(f"{coin} - raw json file was not saved")
