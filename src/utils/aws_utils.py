@@ -57,9 +57,9 @@ def upload_json_s3(data, session, bucket, path):
         return False
     return True
 
-def create_dynamodb_tables(session, dynamodb=None):
+def create_dynamodb_tables(dynamodb=None):
     if not dynamodb:
-        dynamodb = session.resource('dynamodb')
+        dynamodb = boto3.resource('dynamodb')
     try:
         dynamodb.create_table(
             TableName='Schemas',
@@ -145,28 +145,25 @@ def create_dynamodb_tables(session, dynamodb=None):
                 }
         )
         log.info("***Pathes*** was created!")
-        
     except Exception as err:
         log.error('DynamoDB tables were not created. Check parameters')
         log.error(err)
 
-def dynamo_put_item(session, table_name, body, dynamodb=None):
+def dynamo_put_item(table_name, body, dynamodb=None):
     if not dynamodb:
-        dynamodb = session.resource('dynamodb')
-
+        dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
     try:
         table.put_item(Item=body)
-        log.info('Data sucessfully uploaded to DynamoDB')
         return True
     except Exception as err:
         log.error('Faield to upload to DynamoDB')
         log.error(err)
         return False
 
-def dynamo_get_item(session, table_name, key, dynamodb=None):
+def dynamo_get_item(table_name, key, dynamodb=None):
     if not dynamodb:
-        dynamodb = session.resource('dynamodb')
+        dynamodb = boto3.resource('dynamodb')
     table = dynamodb.Table(table_name)
     try:
         response = table.get_item(Key=key)
