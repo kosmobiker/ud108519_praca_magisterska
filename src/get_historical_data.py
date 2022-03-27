@@ -28,16 +28,22 @@ AWS_BUCKET = config['dev']['aws_bucket']
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
+session = boto3.Session(profile_name=AWS_PROFILE)
+s3_client = session.client('s3')
+lambda_client = session.client('lambda')
+
 def get_historical_data(id: str) -> List[str]:
     return json.loads(
             call_get(API_ENDPOINT / "coins" / id / "market_chart", {"vs_currency" : "usd", "days" : "max"})
         )
 
-def save_raw_json(data, coin: str):
-    with open(PATH_RAW_DATA + '/{}_historical_prices.json'.format(coin), 'w') as f:
-        json.dump(data, f)
+# def save_raw_json(data, coin: str):
+#     with open(PATH_RAW_DATA + '/{}_historical_prices.json'.format(coin), 'w') as f:
+#         json.dump(data, f)
 
-def lambda_get_data(func_name: str, params: dict, client):
+def lambda_get_data(func_name: str, params: dict, client=None):
+    if not client:
+        client = boto3.client('lambda')
     response = client.invoke(
             FunctionName=func_name,
             InvocationType='Event',
@@ -59,10 +65,9 @@ if __name__ == "__main__":
     #     log.info('Uploading of raw json files is complete')
     # else:
     #session = boto3.Session(profile_name='default')
-    session = boto3.Session(profile_name=AWS_PROFILE)
-    lambda_client = session.client('lambda')
+    
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1000:1500] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1500:1600] #for test only
     params = {
             "bucket": AWS_BUCKET,
             "path_raw_data": PATH_RAW_DATA
