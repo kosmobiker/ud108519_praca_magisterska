@@ -1,3 +1,7 @@
+"""
+This module is used to get basic information about cryptocurrencies
+It saves it to Hive-table (currently to csv file)
+"""
 import os
 import json
 import boto3
