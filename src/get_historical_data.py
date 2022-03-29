@@ -66,7 +66,7 @@ def lambda_get_data(func_name: str, params: dict, client=None):
 
 if __name__ == "__main__":  
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session)['id'].to_list()[1600:1666] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1700:1800] #for test only
     params = {
             "bucket": AWS_BUCKET,
             "path_raw_data": PATH_RAW_DATA
