@@ -18,12 +18,13 @@ To-do:
 import os
 import json
 import boto3
+import re
 from jsonschema import validate
 from datetime import datetime
 from decimal import Decimal
 from utils.read_config import read_toml_config
 from utils.logger import setup_applevel_logger
-from utils.aws_utils import dynamo_put_item, dynamo_get_item, get_json_s3
+from utils.aws_utils import dynamo_put_item, dynamo_get_item, get_json_s3, create_dynamodb_tables
 
 
 ROOT_DIR = os.path.dirname(__file__)
@@ -43,8 +44,8 @@ session = boto3.Session(profile_name=AWS_PROFILE)
 dynamo = session.resource('dynamodb')
 s3_client = session.client('s3')
 
-# with open('/home/vlad/master_project/config/schema.json') as f:
-#     schema = json.load(f)
+with open('/home/vlad/master_project/config/schema.json') as f:
+    schema = json.load(f)
 
 def get_list_of_objects_s3(operation_parameters, s3=None):
     """
@@ -78,11 +79,13 @@ def data_validation(params: dict, schema):
     gen = get_list_of_objects_s3(params, s3_client) #generator
     for key in gen:
         try:
+            token = re.findall("(?<=data/raw/)(.+)(?=_historical_prices.json)", key)[0]
             data = get_json_s3(params["Bucket"], key, s3_client)
             if len(data['prices']) < 100:
                 dynamo_params = {
-                    'Path' : key,
-                    'Type' : "bad"
+                    'PathS3' : key,
+                    'TypeOfRecord' : "bad",
+                    'TokenName' : token
                 }
                 dynamo_put_item("Pathes", dynamo_params, dynamodb=dynamo)
                 bad += 1
@@ -90,24 +93,27 @@ def data_validation(params: dict, schema):
             else:
                 if validate_json(data, schema):
                     dynamo_params = {
-                        'Path' : key,
-                        'Type' : "good"
+                        'PathS3' : key,
+                        'TypeOfRecord' : "good",
+                        'TokenName' : token
                     }
                     dynamo_put_item("Pathes", dynamo_params, dynamodb=dynamo)
                     good += 1
                     log.info(f'{key} is OK')
                 else:
                     dynamo_params = {
-                        'Path' : key,
-                        'Type' : "dubious"
+                        'PathS3' : key,
+                        'TypeOfRecord' : "dubious",
+                        'TokenName' : token
                     }
                     dynamo_put_item("Pathes", dynamo_params, dynamodb=dynamo)
                     dubious += 1
                     log.info(f"{key} - schema not matched")
         except Exception as err:
             dynamo_params = {
-                    'Path' : key,
-                    'Type' : "bad"
+                    'PathS3' : key,
+                    'TypeOfRecord' : "bad",
+                    'TokenName' : token
                 }
             dynamo_put_item("Pathes", dynamo_params, dynamodb=dynamo)
             bad += 1
@@ -135,6 +141,13 @@ def data_validation(params: dict, schema):
     
 
 if __name__ == "__main__":
+    create_dynamodb_tables(dynamo)
+    body = {
+        'SchemaName' : 'u.darhevich-schema',
+        'SchemaVersion' : '0.2-test',
+        'schema_body': json.dumps(schema)
+    }
+    dynamo_put_item("Schemas", body, dynamo)
     key = {
         'SchemaName' : SCHEMA_NAME,
         'SchemaVersion' : SCHEMA_VERSION
@@ -146,9 +159,4 @@ if __name__ == "__main__":
         'Prefix' : PATH_RAW_DATA
     }
     data_validation(params, schema)
-    # body = {
-    #     'SchemaName' : 'u.darhevich-schema',
-    #     'SchemaVersion' : '0.2-test',
-    #     'schema_body': json.dumps(schema)
-    # }
-    # dynamo_put_item(session, "Schemas", body)
+

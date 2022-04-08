@@ -150,21 +150,21 @@ def create_dynamodb_tables(dynamodb=None):
             TableName='Pathes',
             KeySchema=[
                 {
-                    'AttributeName': 'Path',
+                    'AttributeName': 'PathS3',
                     'KeyType': 'HASH'  # Partition key
                 },
                 {
-                    'AttributeName': 'Type',
+                    'AttributeName': 'TypeOfRecord',
                     'KeyType': 'RANGE'  # Sort key
                 }
             ],
             AttributeDefinitions=[
                 {
-                    'AttributeName': 'Path',
+                    'AttributeName': 'PathS3',
                     'AttributeType': 'S'
                 },
                 {
-                    'AttributeName': 'Type',
+                    'AttributeName': 'TypeOfRecord',
                     'AttributeType': 'S'
                 },
             ],
