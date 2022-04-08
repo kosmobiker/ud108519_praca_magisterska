@@ -7,9 +7,11 @@ from datetime import datetime
 from typing import List
 import pandas as pd
 import boto3
+import awswrangler as wr
 from boto3.dynamodb.conditions import Key
 from utils.read_config import read_toml_config
 from utils.aws_utils import get_json_s3
+from utils.logger import setup_applevel_logger
 
 
 ROOT_DIR = os.path.dirname(__file__)
@@ -18,8 +20,14 @@ config = read_toml_config(CONFIG_PATH)
 PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_to_logs']))
 TODAY = datetime.today().strftime("%Y%m%d")
 PATH_RAW_DATA = config['dev']['path_raw_data']
+PATH_DATALAKE = config['dev']['path_datalake']
 AWS_PROFILE = config['dev']['aws_profile']
 AWS_BUCKET = config['dev']['aws_bucket']
+DATABASE_NAME = config['dev']['database_name'] 
+HISTORICAL_TABLE = config['dev']['historical_table']
+
+log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
+
 
 session = boto3.Session(profile_name=AWS_PROFILE)
 dynamo = session.resource('dynamodb')
@@ -71,14 +79,33 @@ def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
     temp['currency'] = 'usd'
     return temp
 
-def write_to_glue(pandas_df: pd.DataFrame):
-    print('I am a bimbo')
-    pass
+def write_to_glue(pandas_df: pd.DataFrame, token: str):
+    try:
+        wr.s3.to_parquet(
+            df=pandas_df,
+            index=False,
+            path=f"s3://{AWS_BUCKET}/{PATH_DATALAKE}/{HISTORICAL_TABLE}_parquet/",
+            dataset=True,
+            database=DATABASE_NAME,
+            compression='snappy',
+            table=HISTORICAL_TABLE,
+            mode="overwrite_partitions",
+            partition_cols=["coin"],
+            use_threads=(True, 4),
+            concurrent_partitioning=True,
+            boto3_session=session
+        )
+        log.debug(f"{token} was added to {HISTORICAL_TABLE} table")
+    except Exception as err:
+        log.error("Data wasn't added to {HISTORICAL_TABLE} table")
+        log.error(err)
 
-
+#MSCK REPAIR TABLE historical_data
 if __name__ == "__main__":
     pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
     for element in pathes_tokennames:
         data = get_json_s3(AWS_BUCKET, element[0], s3_client)
         pandas_df = transform_json_dataframe(data, element[1])
-        write_to_glue(pandas_df)
+        write_to_glue(pandas_df, element[1])
+
+        #22:04:48,943  - 
