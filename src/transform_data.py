@@ -91,7 +91,7 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
             table=HISTORICAL_TABLE,
             mode="overwrite_partitions",
             partition_cols=["coin"],
-            use_threads=(True, 4),
+            use_threads=(True, 8),
             concurrent_partitioning=True,
             boto3_session=session
         )
@@ -108,4 +108,4 @@ if __name__ == "__main__":
         pandas_df = transform_json_dataframe(data, element[1])
         write_to_glue(pandas_df, element[1])
 
-        #22:04:48,943  - 
+        #22:18:21,943  - 22:51:39,419
