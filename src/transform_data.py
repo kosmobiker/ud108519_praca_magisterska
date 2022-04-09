@@ -1,6 +1,11 @@
 """
 Module for data transformation
-scan dynamodb table ==> get appropriate json from s3 ==> transfrom into dataframe ==> add to glue table
+steps:
+    - scan dynamodb table
+    - get appropriate json from s3
+    - transfrom into dataframe
+    - add data to glue table
+    - update partitions
 """
 import os
 from datetime import datetime
@@ -38,7 +43,6 @@ def convert_lists(response) -> List:
     tokens = [i['TokenName'] for i in response]
     return [list(l) for l in zip(paths, tokens)]
 
-
 def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb')
@@ -61,7 +65,6 @@ def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
         done = start_key is None
 
     return results
-
 
 def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
     ts = [i[0] for i in data['prices']]
@@ -89,9 +92,9 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
             database=DATABASE_NAME,
             compression='snappy',
             table=HISTORICAL_TABLE,
-            mode="overwrite_partitions",
+            mode="overwrite",
             partition_cols=["coin"],
-            use_threads=(True, 8),
+            use_threads=(True, 4),
             concurrent_partitioning=True,
             boto3_session=session
         )
@@ -100,12 +103,24 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
         log.error("Data wasn't added to {HISTORICAL_TABLE} table")
         log.error(err)
 
-#MSCK REPAIR TABLE historical_data
+def repair_partitions(database_name: str, table_name: str, session):
+    try:
+        wr.athena.read_sql_query(
+            f"MSCK REPAIR TABLE {table_name}",
+            database=database_name,
+            boto3_session=session
+            )
+        log.info('Partitions were updated')
+    except Exception as err:
+        log.error('Partitions were not updated')
+        log.error(err)
+
 if __name__ == "__main__":
     pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
     for element in pathes_tokennames:
         data = get_json_s3(AWS_BUCKET, element[0], s3_client)
         pandas_df = transform_json_dataframe(data, element[1])
         write_to_glue(pandas_df, element[1])
-
+        repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, session)
         #22:18:21,943  - 22:51:39,419
+        # too long
