@@ -30,6 +30,8 @@ AWS_PROFILE = config['dev']['aws_profile']
 AWS_BUCKET = config['dev']['aws_bucket']
 DATABASE_NAME = config['dev']['database_name'] 
 HISTORICAL_TABLE = config['dev']['historical_table']
+ATHENA_OUTPUT = config['dev']['athena_output']
+S3_OUTPUT = f"s3://{AWS_BUCKET}/{ATHENA_OUTPUT}/"
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
@@ -103,12 +105,13 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
         log.error("Data wasn't added to {HISTORICAL_TABLE} table")
         log.error(err)
 
-def repair_partitions(database_name: str, table_name: str, session):
+def repair_partitions(database_name: str, table_name: str, s3_output_path: str, session):
     try:
         wr.athena.read_sql_query(
             f"MSCK REPAIR TABLE {table_name}",
             database=database_name,
-            boto3_session=session
+            boto3_session=session,
+            s3_output=s3_output_path
             )
         log.info('Partitions were updated')
     except Exception as err:
@@ -121,6 +124,6 @@ if __name__ == "__main__":
         data = get_json_s3(AWS_BUCKET, element[0], s3_client)
         pandas_df = transform_json_dataframe(data, element[1])
         write_to_glue(pandas_df, element[1])
-        repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, session)
+        repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, S3_OUTPUT, session)
         #22:18:21,943  - 22:51:39,419
         # too long
