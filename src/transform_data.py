@@ -65,7 +65,7 @@ def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
         results.extend(convert_lists(response.get('Items', [])))
         start_key = response.get('LastEvaluatedKey', None)
         done = start_key is None
-
+        log.debug('DynamoDB is scanning....')
     return results
 
 def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
@@ -96,13 +96,13 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
             table=HISTORICAL_TABLE,
             mode="overwrite",
             partition_cols=["coin"],
-            use_threads=(True, 4),
+            use_threads=(True),
             concurrent_partitioning=True,
             boto3_session=session
         )
         log.debug(f"{token} was added to {HISTORICAL_TABLE} table")
     except Exception as err:
-        log.error("Data wasn't added to {HISTORICAL_TABLE} table")
+        log.error(f"Data wasn't added to {HISTORICAL_TABLE} table")
         log.error(err)
 
 def repair_partitions(database_name: str, table_name: str, s3_output_path: str, session):
@@ -124,6 +124,6 @@ if __name__ == "__main__":
         data = get_json_s3(AWS_BUCKET, element[0], s3_client)
         pandas_df = transform_json_dataframe(data, element[1])
         write_to_glue(pandas_df, element[1])
-        repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, S3_OUTPUT, session)
+    repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, S3_OUTPUT, session)
         #22:18:21,943  - 22:51:39,419
         # too long

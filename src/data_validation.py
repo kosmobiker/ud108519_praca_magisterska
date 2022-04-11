@@ -44,8 +44,8 @@ session = boto3.Session(profile_name=AWS_PROFILE)
 dynamo = session.resource('dynamodb')
 s3_client = session.client('s3')
 
-with open('/home/vlad/master_project/config/schema.json') as f:
-    schema = json.load(f)
+# with open('/home/vlad/master_project/config/schema.json') as f:
+#     schema = json.load(f)
 
 def get_list_of_objects_s3(operation_parameters, s3=None):
     """
@@ -141,13 +141,13 @@ def data_validation(params: dict, schema):
     
 
 if __name__ == "__main__":
-    create_dynamodb_tables(dynamo)
-    body = {
-        'SchemaName' : 'u.darhevich-schema',
-        'SchemaVersion' : '0.2-test',
-        'schema_body': json.dumps(schema)
-    }
-    dynamo_put_item("Schemas", body, dynamo)
+    # create_dynamodb_tables(dynamo)
+    # body = {
+    #     'SchemaName' : 'u.darhevich-schema',
+    #     'SchemaVersion' : '0.2-test',
+    #     'schema_body': json.dumps(schema)
+    # }
+    # dynamo_put_item("Schemas", body, dynamo)
     key = {
         'SchemaName' : SCHEMA_NAME,
         'SchemaVersion' : SCHEMA_VERSION
