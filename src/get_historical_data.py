@@ -5,6 +5,8 @@ from list of coins provided by API
 import os
 import json
 from typing import List
+import concurrent.futures
+import threading
 import awswrangler as wr
 import boto3
 from tenacity import *
@@ -34,21 +36,6 @@ session = boto3.Session(profile_name=AWS_PROFILE)
 s3_client = session.client('s3')
 lambda_client = session.client('lambda')
 
-def get_historical_data(id: str) -> List[str]:
-    """
-    Function used to get historical data for each coin
-    Params
-        id: str name of the coin
-    Return
-        List with strings
-    """
-    return json.loads(
-            call_get(API_ENDPOINT / "coins" / id / "market_chart", {"vs_currency" : "usd", "days" : "max"})
-        )
-
-# def save_raw_json(data, coin: str):
-#     with open(PATH_RAW_DATA + '/{}_historical_prices.json'.format(coin), 'w') as f:
-#         json.dump(data, f)
 
 def lambda_get_data(func_name: str, params: dict, client=None):
     """
@@ -63,30 +50,24 @@ def lambda_get_data(func_name: str, params: dict, client=None):
             Payload=json.dumps(params)
         )
     return response
-
-if __name__ == "__main__":  
-    path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1700:1800] #for test only
+    
+def download_coins(coin: str):
+    thread_local.coin = coin
     params = {
             "bucket": AWS_BUCKET,
             "path_raw_data": PATH_RAW_DATA
         }
-    for coin in list_of_coins:
-        # try:
-        #     result = get_historical_data(coin)
-        #     path = f"{PATH_RAW_DATA}/{coin}_historical_prices.json"
-        #     upload_json_s3(result, session, AWS_BUCKET, path)
-        #     log.info(f"{coin} - raw json file was saved")
-        # except Exception as err:
-        #     log.error(f"{coin} - raw json file was not saved")
-        #     log.error(err)
-        try:
-            params['coin'] = coin
-            lambda_get_data(LAMBA_FUNC, params, lambda_client)
-            log.info(f"{coin} - raw json file was saved")
-        except Exception as err:
-            log.error(f"{coin} - raw json file was not saved")
-            log.error(err)        
-            
+    params['coin'] = coin
+    lambda_get_data(LAMBA_FUNC, params, lambda_client)
+    log.info(f"Lambda function to get {coin} was invoked ")
+
+def download_all_coins(coins: List):
+    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+        executor.map(download_coins, coins)
 
 
+if __name__ == "__main__":  
+    thread_local = threading.local()
+    path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1500:1600] #for test only
+    download_all_coins(list_of_coins)
