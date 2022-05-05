@@ -62,12 +62,12 @@ def download_coins(coin: str):
     log.info(f"Lambda function to get {coin} was invoked ")
 
 def download_all_coins(coins: List):
-    with concurrent.futures.ThreadPoolExecutor(max_workers=8) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
         executor.map(download_coins, coins)
 
 
 if __name__ == "__main__":  
     thread_local = threading.local()
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1500:1600] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1700:1800] #for test only
     download_all_coins(list_of_coins)

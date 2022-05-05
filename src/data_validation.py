@@ -158,5 +158,6 @@ if __name__ == "__main__":
         'Bucket' : AWS_BUCKET,
         'Prefix' : PATH_RAW_DATA
     }
-    data_validation(params, schema)
+    if data_validation(params, schema):
+        log.info("Data Validation has finished sucessfully")
 
