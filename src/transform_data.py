@@ -94,9 +94,9 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
             database=DATABASE_NAME,
             compression='snappy',
             table=HISTORICAL_TABLE,
-            mode="overwrite",
+            mode="overwrite_partitions",
             partition_cols=["coin"],
-            use_threads=(True),
+            use_threads=True,
             concurrent_partitioning=True,
             boto3_session=session
         )
