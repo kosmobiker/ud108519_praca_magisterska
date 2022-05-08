@@ -71,25 +71,29 @@ def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
     return results
 
 def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
-    log.debug(f'{token} transform_json_dataframe started')
-    ts = [i[0] for i in data['prices']]
-    prices = [i[1] for i in data['prices']]
-    market_caps = [i[1] for i in data['market_caps']]
-    total_volumes = [i[1] for i in data['total_volumes']]
-    temp = pd.DataFrame({
-        "timestamp" : ts,
-        "prices" : prices,
-        "market_caps" : market_caps,
-        "total_volumes" : total_volumes,
-        "formated_date" : [datetime.fromtimestamp(i/1000).strftime('%Y-%m-%d') for i in ts]
-        })
-    temp['coin'] = token
-    temp['currency'] = 'usd'
-    log.debug(f'{token} transform_json_dataframe started')
-    return temp
+    try:
+        ts = [i[0] for i in data['prices']]
+        prices = [i[1] for i in data['prices']]
+        market_caps = [i[1] for i in data['market_caps']]
+        total_volumes = [i[1] for i in data['total_volumes']]
+        temp = pd.DataFrame({
+            "timestamp" : ts,
+            "prices" : prices,
+            "market_caps" : market_caps,
+            "total_volumes" : total_volumes,
+            "formated_date" : [datetime.fromtimestamp(i/1000).strftime('%Y-%m-%d') for i in ts]
+            })
+        temp['coin'] = token
+        temp['currency'] = 'usd'
+        log.debug(f'{token} transformation was finished')
+        return temp
+    except Exception as err:
+        log.error(err)
+        log.error(f'{token} was not transformed')
+        log.debug(data)
 
-def write_to_glue(pandas_df: pd.DataFrame, token: str):
-    log.debug(f'{token} transform_json_dataframe started')
+def write_to_glue(pandas_df: pd.DataFrame):
+    log.debug(f'Write_to_glue started')
     try:
         wr.s3.to_parquet(
             df=pandas_df,
@@ -105,7 +109,7 @@ def write_to_glue(pandas_df: pd.DataFrame, token: str):
             concurrent_partitioning=True,
             boto3_session=session
         )
-        log.debug(f"{token} was added to {HISTORICAL_TABLE} table")
+        log.debug(f"Data was added to {HISTORICAL_TABLE} table")
     except Exception as err:
         log.error(f"Data wasn't added to {HISTORICAL_TABLE} table")
         log.error(err)
@@ -124,11 +128,13 @@ def repair_partitions(database_name: str, table_name: str, s3_output_path: str, 
         log.error(err)
 
 if __name__ == "__main__":
-    pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
-    for element in pathes_tokennames:
-        data = get_json_s3(AWS_BUCKET, element[0], s3_client)
-        pandas_df = transform_json_dataframe(data, element[1])
-        write_to_glue(pandas_df, element[1])
+    # pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
+    # final_df = pd.DataFrame()
+    # for element in pathes_tokennames:
+    #     data = get_json_s3(AWS_BUCKET, element[0], s3_client)
+    #     pandas_df = transform_json_dataframe(data, element[1])
+    #     final_df = pd.concat([final_df, pandas_df])
+    # write_to_glue(final_df)
     repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, S3_OUTPUT, session)
-        #22:18:21,943  - 22:51:39,419
+        # 10 minutes for ~~700 coins
         # too long
