@@ -43,12 +43,13 @@ s3_client = session.client('s3')
 def convert_lists(response) -> List:
     paths = [i['PathS3'] for i in response]
     tokens = [i['TokenName'] for i in response]
+    log.debug('List converted')
     return [list(l) for l in zip(paths, tokens)]
 
 def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
     if not dynamodb:
         dynamodb = boto3.resource('dynamodb')
-
+    log.debug('scan_paths_table started')
     table = dynamodb.Table('Pathes')
     scan_kwargs = {
         'FilterExpression': Key('TypeOfRecord').eq(type),
@@ -66,9 +67,11 @@ def scan_paths_table(type: str, convert_lists, dynamodb=None) -> List:
         start_key = response.get('LastEvaluatedKey', None)
         done = start_key is None
         log.debug('DynamoDB is scanning....')
+    log.debug('scan_paths_table finished')
     return results
 
 def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
+    log.debug(f'{token} transform_json_dataframe started')
     ts = [i[0] for i in data['prices']]
     prices = [i[1] for i in data['prices']]
     market_caps = [i[1] for i in data['market_caps']]
@@ -82,14 +85,16 @@ def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
         })
     temp['coin'] = token
     temp['currency'] = 'usd'
+    log.debug(f'{token} transform_json_dataframe started')
     return temp
 
 def write_to_glue(pandas_df: pd.DataFrame, token: str):
+    log.debug(f'{token} transform_json_dataframe started')
     try:
         wr.s3.to_parquet(
             df=pandas_df,
             index=False,
-            path=f"s3://{AWS_BUCKET}/{PATH_DATALAKE}/{HISTORICAL_TABLE}_parquet/",
+            path=f"s3://{AWS_BUCKET}/{PATH_DATALAKE}/{HISTORICAL_TABLE}/",
             dataset=True,
             database=DATABASE_NAME,
             compression='snappy',
