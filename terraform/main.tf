@@ -15,7 +15,7 @@ variable "glue_database_name"{
 
 variable "glue_parquet_table_name"{
     type    = string
-    default = "historical_data_coingecko"
+    default = "historical_data"
 }
 
 resource "aws_iam_role" "lambda_role" {
@@ -97,7 +97,7 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
   }
 
   storage_descriptor {
-    location      = "s3://kosmobiker-masterproject/data/datalake/historical_data_coingecko"
+    location      = "s3://kosmobiker-masterproject/data/datalake/historical_data"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 

@@ -116,12 +116,7 @@ def write_to_glue(pandas_df: pd.DataFrame):
 
 def repair_partitions(database_name: str, table_name: str, s3_output_path: str, session):
     try:
-        wr.athena.read_sql_query(
-            f"MSCK REPAIR TABLE {table_name}",
-            database=database_name,
-            boto3_session=session,
-            s3_output=s3_output_path
-            )
+        wr.athena.repair_table(table_name, database_name, s3_output_path, boto3_session=session)
         log.info('Partitions were updated')
     except Exception as err:
         log.error('Partitions were not updated')

@@ -69,5 +69,5 @@ def download_all_coins(coins: List):
 if __name__ == "__main__":  
     thread_local = threading.local()
     path_list_of_coins = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/list_of_coins.csv"
-    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()[1700:1800] #for test only
+    list_of_coins = wr.s3.read_csv([path_list_of_coins], boto3_session=session, encoding='utf8')['id'].to_list()
     download_all_coins(list_of_coins)
