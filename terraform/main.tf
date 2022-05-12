@@ -96,11 +96,6 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
     "parquet.compression" = "SNAPPY"
   }
 
-  partition_keys{
-  	name = "coin"
-  	type = "string"
-  }
-
   storage_descriptor {
     location      = "s3://kosmobiker-masterproject/data/datalake/historical_data_parquet/"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
@@ -113,6 +108,11 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
       parameters = {
         "serialization.format" = 1
       }
+    }
+    
+    columns {
+      name = "coin"
+      type = "string"
     }
 
     columns {
