@@ -32,6 +32,7 @@ DATABASE_NAME = config['dev']['database_name']
 HISTORICAL_TABLE = config['dev']['historical_table']
 ATHENA_OUTPUT = config['dev']['athena_output']
 S3_OUTPUT = f"s3://{AWS_BUCKET}/{ATHENA_OUTPUT}/"
+CHUNK_SIZE = config['dev']['chunk_size']
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
 
@@ -92,6 +93,26 @@ def transform_json_dataframe(data: dict, token: str) -> pd.DataFrame:
         log.error(f'{token} was not transformed')
         log.debug(data)
 
+def chunk_dfs(file_names, chunk_size):
+    """
+    yields n dataframes at a time where n == chunksize
+    """
+    dfs = []
+    for f in file_names:
+        try:
+            data = get_json_s3(AWS_BUCKET, f[0], s3_client)
+            tmp_df = transform_json_dataframe(data, f[1])
+            dfs.append(tmp_df)
+            if len(dfs) == chunk_size:
+                yield dfs
+                dfs  = []
+        except Exception as err:
+            log.error(err)
+            log.error(f"Didn't get df. Trouible with {f[1]}")
+    if dfs:
+        yield dfs
+
+
 def write_to_glue(pandas_df: pd.DataFrame):
     log.debug(f'Write_to_glue started')
     try:
@@ -103,8 +124,8 @@ def write_to_glue(pandas_df: pd.DataFrame):
             database=DATABASE_NAME,
             compression='snappy',
             table=HISTORICAL_TABLE,
-            mode="overwrite_partitions",
-            partition_cols=["coin"],
+            mode="append",
+            # partition_cols=["coin"],
             use_threads=True,
             concurrent_partitioning=True,
             boto3_session=session
@@ -123,13 +144,16 @@ def repair_partitions(database_name: str, table_name: str, s3_output_path: str, 
         log.error(err)
 
 if __name__ == "__main__":
-    # pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
-    # final_df = pd.DataFrame()
-    # for element in pathes_tokennames:
-    #     data = get_json_s3(AWS_BUCKET, element[0], s3_client)
-    #     pandas_df = transform_json_dataframe(data, element[1])
-    #     final_df = pd.concat([final_df, pandas_df])
-    # write_to_glue(final_df)
+    pathes_tokennames = scan_paths_table('good', convert_lists, dynamo)
+    chunks = (pd.concat(dfs) for dfs in chunk_dfs(pathes_tokennames, 250))
+    for chunk in chunks:
+        try:
+            write_to_glue(chunk)
+        except Exception as err:
+            log.error(err)
+            log.error("Chunk is lost. It wasn't written to Hive")
     repair_partitions(DATABASE_NAME, HISTORICAL_TABLE, S3_OUTPUT, session)
-        # 10 minutes for ~~700 coins
-        # too long
+
+    
+
+
