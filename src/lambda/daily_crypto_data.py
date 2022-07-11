@@ -51,7 +51,7 @@ def lambda_handler(event, context):
             for currency in list_of_currencies:
                 if coin != currency:
                     result = get_daily_data(coin, currency)
-                    path = f"data/{basic_folder}/{year}/{month}/{day}/{coin}-{currency}.json"
+                    path = f"data/{basic_folder}/{coin}-{currency}/{year}_{month}_{day}_{coin}-{currency}/.json"
                     upload_json_s3(result, bucket, path)
         logger.info(f"{coin}-{currency} was uploaded to S3")
         return True
