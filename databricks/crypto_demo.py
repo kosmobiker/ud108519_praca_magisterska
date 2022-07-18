@@ -1,8 +1,5 @@
 # Databricks notebook source
-#%pip install cryptocompare yfinance
-
-# COMMAND ----------
-
+import os
 import cryptocompare
 from pyspark.sql.types import *
 import pyspark.sql.functions as F
@@ -40,28 +37,23 @@ from sparknlp.pretrained import PretrainedPipeline
 
 # COMMAND ----------
 
-# MAGIC %md ### Setup
+# MAGIC %md ## Setup
 
 # COMMAND ----------
 
-CRYPTO_COMPARE_KEY = "6188db038cad874de5eb7da3821490d45967ae07911bb365904d2b1759400ea4"
-cryptocompare.cryptocompare._set_api_key_parameter(CRYPTO_COMPARE_KEY)
+crypto_compare_key = os.getenv("CRYPTO_COMPARE_KEY")
+cryptocompare.cryptocompare._set_api_key_parameter(crypto_compare_key)
 
-access_key = "AKIASCI2223QIRILVKE4"
-secret_key = "gz4SrFF/E9sXLUGV2F1wDF1JPXrBm8AIFR6pdHYF"
+access_key = os.getenv("ACCESS_KEY")
+secret_key = os.getenv("SECRET_KEY")
 encoded_secret_key = secret_key.replace("/", "%2F")
 aws_bucket_name = "databricks-demo-vlad"
 mount_name = "databricks"
 
-# access_key = "AKIASCI2223QIRILVKE4"
-# secret_key = "gz4SrFF/E9sXLUGV2F1wDF1JPXrBm8AIFR6pdHYF"
-# encoded_secret_key = secret_key.replace("/", "%2F")
-# aws_bucket_name = "kosmobiker-masterproject"
-# mount_name = "databricks"
 
 # dbutils.fs.unmount("/mnt/databricks/")
-dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_name), "/mnt/%s" % mount_name)
-# dbutils.fs.refreshMounts()
+# dbutils.fs.mount("s3a://%s:%s@%s" % (access_key, encoded_secret_key, aws_bucket_name), "/mnt/%s" % mount_name)
+dbutils.fs.refreshMounts()
 display(dbutils.fs.ls("/mnt/"))
 
 # COMMAND ----------
@@ -73,19 +65,15 @@ path_to_lake = f"dbfs:/mnt/databricks/{datalake_name}"
 
 #setup twitter
 
-consumer_key = "A2sOv6W6ntXbmzXMzfRwDVRNN"
-consumer_secret = "i6ch2aVSnxNSBQ6s5ztZP1OiTM0zvianPlugLPIorbDZJ00w20"
-bear_tocken = "AAAAAAAAAAAAAAAAAAAAAOc1cQEAAAAAKMCNMPEqMTBUR4X6dm5QXMJqLT8%3Du2QFddiDUu8dLqqC6qHknGvfYdXPIslKViSDEDp3kqhJs8b7PW"
-
-client_id = "RlRheEY2aFEwOXRSRUhaUlhZU2g6MTpjaQ"
-client_secret = "YPRlTg7Yag9-AE2oQr8a5GzcfdogIQExmVSpnnT6iBnJB8K9pU"
+consumer_key = os.getenv("CONSUMER_KEY")
+consumer_secret = os.getenv("CONSUMER_SECRET")
 
 auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
-api = tweepy.API(auth,wait_on_rate_limit=True)
+api = tweepy.API(auth, wait_on_rate_limit=True)
 
 # COMMAND ----------
 
-# MAGIC %md ### Basic info about coins
+# MAGIC %md ## Basic info about coins
 
 # COMMAND ----------
 
@@ -118,16 +106,16 @@ coin_info_df = spark.createDataFrame(coin_info.values(), schema=coin_info_schema
     .write
     .format('delta')
     .mode('overwrite')
-    .save(f"{path_to_lake}/coin_list")
+    .saveAsTable("coin_list")
 )
 
 # COMMAND ----------
 
-display(spark.read.format('delta').load(f"{path_to_lake}/coin_list"))
+display(spark.read.table("coin_list"))
 
 # COMMAND ----------
 
-df = (spark.read.format('delta').load(f"{path_to_lake}/coin_list"))
+df = (spark.read.table("coin_list"))
 list_of_coins = [
     "BTC",
     "ETH",
@@ -152,7 +140,8 @@ created_on
 
 # COMMAND ----------
 
-# MAGIC %md ### BRONZE LEVEL
+# MAGIC %md ## BRONZE LEVEL
+# MAGIC ### Historical OHLC data
 
 # COMMAND ----------
 
@@ -221,17 +210,56 @@ for coin in list_of_coins:
         if coin != cur:
             try:
                 df = get_historical_data(coin, cur, created_on, dataframe_schema)
-                df = df.fillna(value=f"{coin}-{cur}", subset=['coin_currency']) 
+                df = df.fillna(value=f"{coin}_{cur}", subset=['coin_currency']) 
                 (df.coalesce(1)
                     .write
                     .format('delta')
-                    .mode('overwrite')
-                    .option("overwriteSchema", "true")
-                    .save(f"{path_to_lake}/BRONZE/historical_data/{coin}_{cur}")
+                    .mode('append')
+                    .saveAsTable("BRONZE_OHLC_DATA")
                 )
-                print(f"{coin}-{cur} was uploaded!")
+                print(f"{coin}_{cur} was uploaded!")
             except Exception as err:
                 print(err)
+
+# COMMAND ----------
+
+# MAGIC %md ###Daily OHLC data
+
+# COMMAND ----------
+
+path_to_daily_data = f"{path_to_lake}/daily_crypto_data"
+path_to_daily_data
+
+# COMMAND ----------
+
+list_of_pathes = [path for path in dbutils.fs.ls(path_to_daily_data)]
+def get_minutes_data(path):
+    data = []
+    for path in list_of_pathes:
+        name = path.name[:-1]
+        path_json = path.path
+        tmp = spark.read.json(path_json, schema=dataframe_schema)
+        tmp = tmp.fillna(value=f"{name}", subset=['coin_currency']) 
+        data.append(tmp)
+    return reduce(DataFrame.unionAll, data)
+
+# COMMAND ----------
+
+minutes_data = get_minutes_data(list_of_pathes)
+display(minutes_data)
+
+# COMMAND ----------
+
+(minutes_data.coalesce(1)
+            .write
+            .format('delta')
+            .mode('append')
+            .saveAsTable("BRONZE_OHLC_DATA")
+            )
+
+# COMMAND ----------
+
+# MAGIC %md ### Twitter data
 
 # COMMAND ----------
 
@@ -257,84 +285,63 @@ twitter_schema = StructType(fields=[
 
 # COMMAND ----------
 
-#read tweets from S3
-tweets_df = spark.read.json(f"{path_to_lake}/BRONZE/daily_tweets/", schema=twitter_schema).dropDuplicates()
-(tweets_df.coalesce(1)
-    .write
-    .format('delta')
-    .mode('overwrite')
-    .save(f"{path_to_lake}/BRONZE/daily_tweets_delta/")
-)
+tweets_df = spark.read.json(f"{path_to_lake}/daily_tweets/", schema=twitter_schema).dropDuplicates()
+tweets_df.display()
 
 # COMMAND ----------
 
-# tweets_df.select('id').distinct().count()
+# MAGIC %md ## SILVER LEVEL
 
 # COMMAND ----------
 
-# MAGIC %md ### SILVER LEVEL
+# MAGIC %md ### Enrichment of daily OHLC data
 
 # COMMAND ----------
 
-display(spark.read.format('delta').load(f"{path_to_lake}/BRONZE/historical_data/BNB_BTC"))
+bronze_ohlc = spark.read.table("BRONZE_OHLC_DATA")
+display(bronze_ohlc)
 
 # COMMAND ----------
 
-list_of_pathes = [path[0] for path in dbutils.fs.ls(f"{path_to_lake}/BRONZE/historical_data")]
-
-# COMMAND ----------
-
-def bronze_to_silver_ohlc(list_of_pathes):
-    try:
-        data = []
-        for path in list_of_pathes:
-            tmp = spark.read.format('delta').load(path)
-            data.append(tmp)
-        silver_df = reduce(DataFrame.unionAll, data)
-        silver_df = (silver_df.withColumn('date_time', F.from_unixtime(F.col('time'), 'yyyy-MM-dd HH:mm:ss'))
-                             .withColumn('year', F.from_unixtime(F.col("time"),"yyyy"))
-                             .withColumn('coin', F.split(F.col('coin_currency'), '-').getItem(0))
-                             .withColumn('currency', F.split(F.col('coin_currency'), '-').getItem(1))
+def bronze_to_silver_ohlc(df):
+    df = (df.withColumn('date_time', F.from_unixtime(F.col('time'), 'yyyy-MM-dd HH:mm:ss'))
+                             .withColumn('year', F.from_unixtime(F.col("time"),"yyyy").cast(IntegerType()))
+                             .withColumn('month', F.from_unixtime(F.col("time"),"MM").cast(IntegerType()))
+                             .withColumn('day', F.from_unixtime(F.col("time"),"dd").cast(IntegerType()))
+                             .withColumn('hour', F.from_unixtime(F.col("time"),"HH").cast(IntegerType()))
+                             .withColumn('minute', F.from_unixtime(F.col("time"),"mm").cast(IntegerType()))
+                             .withColumn('coin', F.split(F.col('coin_currency'), '_').getItem(0))
+                             .withColumn('currency', F.split(F.col('coin_currency'), '_').getItem(1))
                              .withColumn('delta', (F.col('close') - F.col('open'))*100/F.col('open'))
                              .withColumnRenamed('time', 'time_stamp')
                              .withColumnRenamed('volumefrom', 'volume_fsym')
                              .withColumnRenamed('volumeto', 'volume_tsym')
+                             .withColumnRenamed('coin', 'ticker')
                     )
-        silver_df = silver_df.select('coin', 'date_time', 'open', 'high', 'low', 'close', 'volume_fsym', 'volume_tsym', 'currency', 'delta', 'time_stamp', 'year')
-        return silver_df
-    except Exception as err:
-        print(err)  
-
+    return df.select('ticker', 'date_time', 'open', 'high', 'low', 'close', 'volume_fsym', 'volume_tsym',
+                     'currency', 'delta', 'time_stamp', 'year', 'month', 'day', 'hour', 'minute')
 
 # COMMAND ----------
 
-silver_df = bronze_to_silver_ohlc(list_of_pathes)
+silver_df = bronze_to_silver_ohlc(bronze_ohlc)
 display(silver_df)
 
 # COMMAND ----------
 
-#add daily data
-path_to_daily_data = ""
-daily_ohlc_data = ""
+silver_df.filter("ticker = 'BTC' AND date_time > '2022-07-15'").display()
 
 # COMMAND ----------
 
 (silver_df.coalesce(1)
-        .write
-        .format('delta')
-        .mode('overwrite')
-        .save(f"{path_to_lake}/SILVER/OHLC_data")
-        )
-# (daily_ohlc_data.write
-#         .format('delta')
-#         .partitionBy("year")
-#         .mode('append')
-#         .save(f"{path_to_lake}/SILVER/OHLC_data")
-#         )
+            .write
+            .format('delta')
+            .mode('append')
+            .saveAsTable("SILVER_OHLC_DATA")
+            )
 
 # COMMAND ----------
 
-tweets_df = spark.read.format('delta').load(f"{path_to_lake}/BRONZE/daily_tweets_delta/")
+# MAGIC %md ### Sentimetal analysis of tweets
 
 # COMMAND ----------
 
@@ -383,9 +390,6 @@ def bronze_to_silver_tweets(tweets_df):
 # COMMAND ----------
 
 twitter_df_silver = bronze_to_silver_tweets(tweets_df)
-
-# COMMAND ----------
-
 twitter_df_silver.display()
 
 # COMMAND ----------
@@ -394,63 +398,66 @@ twitter_df_silver.groupBy('sentiment').count().show()
 
 # COMMAND ----------
 
-# MAGIC %md ### GOLD LEVEL
+(twitter_df_silver.coalesce(1)
+            .write
+            .format('delta')
+            .mode('append')
+            .saveAsTable("SILVER_TWITTER_DATA")
+            )
 
 # COMMAND ----------
 
-#merge ohlc_data and tweets data
+# MAGIC %md ## DATA ANALYSIS
 
 # COMMAND ----------
 
-df = spark.read.format('delta').load(f"{path_to_lake}/GOLD")
-df.createOrReplaceTempView('coins_db')
-df.display()
+# MAGIC %md ### Crypto Analysis Examples
 
 # COMMAND ----------
 
-df.select([F.count(F.when(F.isnan(c) | F.col(c).isNull(), c)).alias(c) for c in df.columns]).show()
+silver_ohlc = spark.read.table("silver_ohlc_data")
+silver_ohlc.createOrReplaceTempView('silver_ohlc')
 
 # COMMAND ----------
 
 # MAGIC %md Some analysis of the coins
 # MAGIC 
-# MAGIC - How did Etherium price in USD vary over time?
+# MAGIC - How did Etherium price in BTC vary over time?
 # MAGIC - How did Etherium daily returns vary over time? Which days had the worst and best returns?
 # MAGIC - Which cryptocurrencies had the top daily return?
-# MAGIC - What is the most popular cryptocurencies?
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC CREATE OR REPLACE TEMP VIEW closing_price_weekly AS
-# MAGIC SELECT coin, currency, date_trunc('week', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
-# MAGIC FROM coins_db
-# MAGIC GROUP BY coin, currency, time_period
+# MAGIC SELECT ticker, currency, date_trunc('week', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
+# MAGIC FROM silver_ohlc
+# MAGIC GROUP BY ticker, currency, time_period
 # MAGIC ORDER BY time_period;
 # MAGIC 
 # MAGIC CREATE OR REPLACE TEMP VIEW closing_price_daily AS
-# MAGIC SELECT coin, currency, date_trunc('day', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
-# MAGIC FROM coins_db
-# MAGIC GROUP BY coin, currency, time_period
+# MAGIC SELECT ticker, currency, date_trunc('day', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
+# MAGIC FROM silver_ohlc
+# MAGIC GROUP BY ticker, currency, time_period
 # MAGIC ORDER BY time_period;
 
 # COMMAND ----------
 
 # MAGIC %sql
 # MAGIC SELECT * FROM closing_price_weekly
-# MAGIC WHERE coin = 'ETH' AND currency = 'USD'
+# MAGIC WHERE ticker = 'ETH' AND currency = 'BTC'
 
 # COMMAND ----------
 
-df = spark.sql("SELECT * FROM closing_price_weekly WHERE coin = 'ETH' AND currency = 'USD'").toPandas()
+df = spark.sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'BTC'").toPandas()
 
-plt.figure(figsize=(16, 6))
+plt.figure(figsize=(21, 6))
 xs=df['time_period']
 ys=df['closing_price'].astype('float')
-plt.plot(xs, ys, label='ETH/USD', lw=3, color='orange')
+plt.plot(xs, ys, label='ETH/BTC', lw=3, color='navy')
 plt.legend(fontsize=15)
 plt.xlabel('years')
-plt.ylabel('USD, $')
+plt.ylabel('BTC')
 plt.grid()
 plt.show()
 
@@ -460,16 +467,17 @@ plt.show()
 # MAGIC library(SparkR)
 # MAGIC library(ggplot2)
 # MAGIC 
+# MAGIC 
 # MAGIC #transform data
-# MAGIC r_df <- collect(sql("SELECT * FROM closing_price_weekly WHERE coin = 'ETH' AND currency = 'USD'")) 
+# MAGIC r_df <- collect(sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'BTC'")) 
 # MAGIC r_df$closing_price <- as.numeric(as.character(r_df$closing_price))
 # MAGIC 
 # MAGIC #plot itself
-# MAGIC options(repr.plot.width=900, repr.plot.height=600)
+# MAGIC options(repr.plot.width=1200, repr.plot.height=500)
 # MAGIC img1 <- ggplot(data = r_df, aes(x=time_period, y=closing_price)) + 
 # MAGIC                         geom_line(size=1, color='navy') +
-# MAGIC                         ggtitle("ETH/USD closing prices") +
-# MAGIC                         labs(x = "Date",y = "USD") +
+# MAGIC                         ggtitle("ETH/BTC closing prices") +
+# MAGIC                         labs(x = "Date",y = "BTC") +
 # MAGIC                         theme(
 # MAGIC                             plot.margin = margin(0.5, 0.666, 0.45, 1, "cm"),
 # MAGIC                             panel.background = element_rect(fill = "orange"),
@@ -485,31 +493,37 @@ plt.show()
 # MAGIC %sql
 # MAGIC SELECT time_period, closing_price / LEAD(closing_price) OVER prices AS daily_factor
 # MAGIC FROM (
-# MAGIC   SELECT coin, currency, time_period, closing_price
+# MAGIC   SELECT ticker, currency, time_period, closing_price
 # MAGIC   FROM closing_price_daily
-# MAGIC   WHERE coin = 'ETH' AND currency = 'USD' AND time_period > '2020-01-01'
+# MAGIC   WHERE ticker = 'ETH' AND currency = 'USD' AND time_period > '2020-03-01'
 # MAGIC ) sub WINDOW prices AS (ORDER BY time_period DESC)
 
 # COMMAND ----------
 
-sp = yahooFinance.Ticker("^GSPC").history(interval='1d', start='2013-06-29', end='2022-07-02')
+# MAGIC %md
+# MAGIC - https://www.cnbc.com/2020/03/13/bitcoin-loses-half-of-its-value-in-two-day-plunge.html
+# MAGIC - https://www.coindesk.com/markets/2020/03/12/ether-suffers-record-setting-33-drop-amid-global-market-turmoil/
+
+# COMMAND ----------
+
+sp = yahooFinance.Ticker("^GSPC").history(interval='1d', start='2013-06-29', end='2022-07-16')
 
 sp = sp.resample('1d').ffill()
 sp['daily_factor'] = sp["Close"].pct_change() + 1
 sp.reset_index(inplace=True)
-sp['coin'] = 'S&P 500'
+sp['ticker'] = 'S&P 500'
 sp = sp.rename(columns={'Date' : 'time_period', 'Close' : 'closing_price'})
-sp = sp[['coin', 'time_period', 'daily_factor']]
+sp = sp[['ticker', 'time_period', 'daily_factor']]
 spark.createDataFrame(sp).createOrReplaceTempView('sp_db')
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT coin, time_period, closing_price / LEAD(closing_price) OVER prices AS daily_factor
+# MAGIC SELECT ticker, time_period, closing_price / LEAD(closing_price) OVER prices AS daily_factor
 # MAGIC FROM (
-# MAGIC   SELECT coin, currency, time_period, closing_price
+# MAGIC   SELECT ticker, currency, time_period, closing_price
 # MAGIC   FROM closing_price_daily
-# MAGIC   WHERE coin = 'BTC' AND currency = 'USD' AND time_period > '2020-01-01'
+# MAGIC   WHERE ticker = 'ETH' AND currency = 'USD' AND time_period > '2020-01-01'
 # MAGIC ) sub WINDOW prices AS (ORDER BY time_period DESC)
 # MAGIC UNION
 # MAGIC SELECT * FROM sp_db
@@ -522,28 +536,28 @@ spark.createDataFrame(sp).createOrReplaceTempView('sp_db')
 # MAGIC WITH
 # MAGIC prev_day_closing AS (
 # MAGIC     SELECT
-# MAGIC       coin,
+# MAGIC       ticker,
 # MAGIC       currency,
 # MAGIC       time_period,
 # MAGIC       closing_price,
-# MAGIC       LEAD(closing_price) OVER (PARTITION BY coin ORDER BY time_period DESC) AS prev_day_closing_price
+# MAGIC       LEAD(closing_price) OVER (PARTITION BY ticker ORDER BY time_period DESC) AS prev_day_closing_price
 # MAGIC     FROM closing_price_daily
 # MAGIC     WHERE currency = 'USD'
 # MAGIC ),
 # MAGIC daily_factor AS (
 # MAGIC     SELECT 
-# MAGIC       coin,
+# MAGIC       ticker,
 # MAGIC       time_period,
 # MAGIC       CASE WHEN prev_day_closing_price = 0 THEN 0 ELSE closing_price/prev_day_closing_price END AS daily_factor
 # MAGIC     FROM prev_day_closing
 # MAGIC ),
 # MAGIC ranking_daily AS (
 # MAGIC     SELECT
-# MAGIC       time_period, coin, daily_factor,
+# MAGIC       time_period, ticker, daily_factor,
 # MAGIC       ROW_NUMBER() OVER (PARTITION BY time_period ORDER BY daily_factor DESC) AS ranking
 # MAGIC     FROM daily_factor
 # MAGIC )
-# MAGIC SELECT time_period, coin, daily_factor
+# MAGIC SELECT time_period, ticker, daily_factor
 # MAGIC FROM ranking_daily
 # MAGIC WHERE ranking = 1
 # MAGIC ORDER BY time_period DESC
@@ -553,3 +567,84 @@ spark.createDataFrame(sp).createOrReplaceTempView('sp_db')
 # MAGIC %sql
 # MAGIC SELECT *
 # MAGIC FROM highest_daily_returns
+# MAGIC WHERE time_period  > '2022-01-01'
+
+# COMMAND ----------
+
+# MAGIC %md ### Tweets vs Crypto Analysis
+
+# COMMAND ----------
+
+silver_ohlc = spark.read.table("silver_ohlc_data")
+silver_tweets = spark.read.table("silver_twitter_data")
+
+
+# COMMAND ----------
+
+gold_df = silver_tweets.join(
+                            silver_ohlc,
+                            how='inner', 
+                            on=['ticker', 'month', 'day', 'hour', 'minute'])\
+                        .filter("currency = 'USD'")
+(gold_df.write
+        .format('delta')
+        .mode('overwrite')
+        .saveAsTable("GOLD_TABLE")
+        )
+
+# COMMAND ----------
+
+gold_df.createOrReplaceTempView('gold_tmp')
+gold_df.display()
+
+# COMMAND ----------
+
+# MAGIC %md Insights
+# MAGIC - Net Sentiment by Crypto Ticker and possible correlation
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT
+# MAGIC   ticker,
+# MAGIC   DATE(created_at) as Day,
+# MAGIC   hour,
+# MAGIC   count(CASE WHEN sentiment = 'positive' THEN 1 END) AS positive,
+# MAGIC   count(CASE WHEN sentiment = 'neutral' THEN 1 END) AS neutral,
+# MAGIC   count(CASE WHEN sentiment = 'negative' THEN 1 END) AS negative,
+# MAGIC   count(CASE WHEN sentiment = 'positive' THEN 1 END) - count(CASE WHEN sentiment = 'negative' THEN 1 END) AS net_sentiment,
+# MAGIC   avg(delta)
+# MAGIC FROM
+# MAGIC     gold_tmp
+# MAGIC GROUP BY ticker, DATE(created_at), hour
+# MAGIC ORDER BY ticker, DATE(created_at), hour
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC WITH cte AS (
+# MAGIC     SELECT
+# MAGIC       ticker,
+# MAGIC       DATE(created_at) as Day,
+# MAGIC       hour,
+# MAGIC       count(CASE WHEN sentiment = 'positive' THEN 1 END) AS positive,
+# MAGIC       count(CASE WHEN sentiment = 'neutral' THEN 1 END) AS neutral,
+# MAGIC       count(CASE WHEN sentiment = 'negative' THEN 1 END) AS negative,
+# MAGIC       count(CASE WHEN sentiment = 'positive' THEN 1 END) - count(CASE WHEN sentiment = 'negative' THEN 1 END) AS net_sentiment,
+# MAGIC       avg(delta) AS AVG_DELTA
+# MAGIC     FROM
+# MAGIC         gold_tmp
+# MAGIC     GROUP BY ticker, DATE(created_at), hour
+# MAGIC     ORDER BY ticker, DATE(created_at), hour
+# MAGIC )
+# MAGIC SELECT ticker,
+# MAGIC         corr(net_sentiment, AVG_DELTA) AS `corr net avg`,
+# MAGIC         corr(positive, AVG_DELTA) AS `corr pos avg`,
+# MAGIC         corr(neutral, AVG_DELTA) as `corr neu avg`,
+# MAGIC         corr(negative, AVG_DELTA) as `corr neg avg`
+# MAGIC FROM cte
+# MAGIC GROUP BY ticker
+
+# COMMAND ----------
+
+|
