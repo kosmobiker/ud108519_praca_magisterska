@@ -32,9 +32,6 @@ from sparknlp.base import *
 import sparknlp
 from sparknlp.pretrained import PretrainedPipeline
 
-
-
-
 # COMMAND ----------
 
 # MAGIC %md ## Setup
@@ -328,10 +325,6 @@ display(silver_df)
 
 # COMMAND ----------
 
-silver_df.filter("ticker = 'BTC' AND date_time > '2022-07-15'").display()
-
-# COMMAND ----------
-
 (silver_df.coalesce(1)
             .write
             .format('delta')
@@ -415,7 +408,7 @@ twitter_df_silver.groupBy('sentiment').count().show()
 
 # COMMAND ----------
 
-silver_ohlc = spark.read.table("silver_ohlc_data")
+silver_ohlc = spark.read.table("silver_ohlc_data").dropDuplicates()
 silver_ohlc.createOrReplaceTempView('silver_ohlc')
 
 # COMMAND ----------
@@ -578,7 +571,6 @@ spark.createDataFrame(sp).createOrReplaceTempView('sp_db')
 silver_ohlc = spark.read.table("silver_ohlc_data")
 silver_tweets = spark.read.table("silver_twitter_data")
 
-
 # COMMAND ----------
 
 gold_df = silver_tweets.join(
@@ -647,4 +639,4 @@ gold_df.display()
 
 # COMMAND ----------
 
-|
+
