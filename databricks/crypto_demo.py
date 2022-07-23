@@ -1,4 +1,89 @@
 # Databricks notebook source
+# MAGIC %md # Analyzing Crypto Data Using Databricks
+# MAGIC 
+# MAGIC ![Databricks logo](https://upload.wikimedia.org/wikipedia/commons/thumb/6/63/Databricks_Logo.png/640px-Databricks_Logo.png)
+# MAGIC 
+# MAGIC **Goals**:
+# MAGIC - Get familiar with Databricks platform
+# MAGIC - Explore possibilities of Databricks notrebooks
+# MAGIC - Build a small data lake using *Delta lake* technology
+# MAGIC - Leran how to use different Databricks tools
+# MAGIC - Analyze the OHLC data regarding the selected cryptocurrencies and associated tweets
+# MAGIC - Try to find some insights
+
+# COMMAND ----------
+
+# MAGIC %md 
+# MAGIC 
+# MAGIC ## Databricks Notebook possibilities
+# MAGIC 
+# MAGIC support of magic commands from Jupyter + special magic commands from Databricks
+# MAGIC 
+# MAGIC More info is [here](https://docs.databricks.com/notebooks/notebooks-use.html)
+
+# COMMAND ----------
+
+# MAGIC %fs
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC $$\text{Databricks Notebook supports \LaTeX and \KaTeX}$$
+# MAGIC 
+# MAGIC \\(c = \\pm\\sqrt{a^2 + b^2} \\)
+# MAGIC 
+# MAGIC \\(A{_i}{_j}=B{_i}{_j}\\)
+# MAGIC 
+# MAGIC $$c = \\pm\\sqrt{a^2 + b^2}$$
+# MAGIC 
+# MAGIC \\[A{_i}{_j}=B{_i}{_j}\\]
+
+# COMMAND ----------
+
+displayHTML("""<!DOCTYPE html>
+<html>
+<body>
+
+<h2>Width and Height Attributes</h2>
+
+<p>The width and height attributes of the img tag, defines the width and height of the image:</p>
+
+<img src="https://cdn.pixabay.com/photo/2017/08/05/11/16/logo-2582748_960_720.png" width="300" height="300">
+
+</body>
+</html>
+""")
+
+# COMMAND ----------
+
+# MAGIC %md You can use comments
+
+# COMMAND ----------
+
+print('hello world')
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ## Crypto Data + Tweets
+# MAGIC 
+# MAGIC - Data Ingestion:
+# MAGIC   + Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using cryptocompare API
+# MAGIC   + Daily data OHLC data from S3 bucket (15 minutes interval)
+# MAGIC   + Daily tweets from s3 bucket
+# MAGIC   
+# MAGIC - Data Transformation:
+# MAGIC   + OHLC data enrichment
+# MAGIC   + sentimental analysis of tweets (positive, neutral, negative)
+# MAGIC   
+# MAGIC - Data Loading to Delta Tables:
+# MAGIC   + bronze tables for raw data
+# MAGIC   + silver tables for data after transformation
+# MAGIC   + gold table for anaysis
+
+# COMMAND ----------
+
 import os
 import cryptocompare
 from pyspark.sql.types import *
@@ -105,6 +190,10 @@ coin_info_df = spark.createDataFrame(coin_info.values(), schema=coin_info_schema
     .mode('overwrite')
     .saveAsTable("coin_list")
 )
+
+# COMMAND ----------
+
+spark.read.table("coin_list").show(1, False, True)
 
 # COMMAND ----------
 
@@ -421,28 +510,51 @@ silver_ohlc.createOrReplaceTempView('silver_ohlc')
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC CREATE OR REPLACE TEMP VIEW closing_price_weekly AS
-# MAGIC SELECT ticker, currency, date_trunc('week', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
-# MAGIC FROM silver_ohlc
-# MAGIC GROUP BY ticker, currency, time_period
-# MAGIC ORDER BY time_period;
-# MAGIC 
-# MAGIC CREATE OR REPLACE TEMP VIEW closing_price_daily AS
-# MAGIC SELECT ticker, currency, date_trunc('day', date_time) AS time_period, FIRST_VALUE(close) AS closing_price
-# MAGIC FROM silver_ohlc
-# MAGIC GROUP BY ticker, currency, time_period
-# MAGIC ORDER BY time_period;
+# MAGIC %sql CREATE
+# MAGIC OR REPLACE TEMP VIEW closing_price_weekly AS
+# MAGIC SELECT
+# MAGIC   ticker,
+# MAGIC   currency,
+# MAGIC   date_trunc('week', date_time) AS time_period,
+# MAGIC   FIRST_VALUE(close) AS closing_price
+# MAGIC FROM
+# MAGIC   silver_ohlc
+# MAGIC GROUP BY
+# MAGIC   ticker,
+# MAGIC   currency,
+# MAGIC   time_period
+# MAGIC ORDER BY
+# MAGIC   time_period;
+# MAGIC CREATE
+# MAGIC   OR REPLACE TEMP VIEW closing_price_daily AS
+# MAGIC SELECT
+# MAGIC   ticker,
+# MAGIC   currency,
+# MAGIC   date_trunc('day', date_time) AS time_period,
+# MAGIC   FIRST_VALUE(close) AS closing_price
+# MAGIC FROM
+# MAGIC   silver_ohlc
+# MAGIC GROUP BY
+# MAGIC   ticker,
+# MAGIC   currency,
+# MAGIC   time_period
+# MAGIC ORDER BY
+# MAGIC   time_period;
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM closing_price_weekly
-# MAGIC WHERE ticker = 'ETH' AND currency = 'BTC'
+# MAGIC SELECT
+# MAGIC   *
+# MAGIC FROM
+# MAGIC   closing_price_weekly
+# MAGIC WHERE
+# MAGIC   ticker = 'ETH'
+# MAGIC   AND currency = 'BTC'
 
 # COMMAND ----------
 
-df = spark.sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'BTC'").toPandas()
+df = _sqldf.toPandas()
 
 plt.figure(figsize=(21, 6))
 xs=df['time_period']
@@ -463,7 +575,6 @@ plt.show()
 # MAGIC 
 # MAGIC #transform data
 # MAGIC r_df <- collect(sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'BTC'")) 
-# MAGIC r_df$closing_price <- as.numeric(as.character(r_df$closing_price))
 # MAGIC 
 # MAGIC #plot itself
 # MAGIC options(repr.plot.width=1200, repr.plot.height=500)
