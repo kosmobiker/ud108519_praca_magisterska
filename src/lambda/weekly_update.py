@@ -6,9 +6,7 @@ import pandas as pd
 import boto3
 import datetime
 import json
-import numpy as np
 import re
-from datetime import datetime, timedelta
 import awswrangler as wr
 import pytz
 
@@ -16,9 +14,8 @@ import pytz
 logger = logging.getLogger()
 logger.setLevel(logging.DEBUG)
 
-utc=pytz.UTC
-
-bucket = os.environ['AWS_BUCKET']
+UTC = pytz.UTC
+BUCKET = os.environ['AWS_BUCKET']
 
 def get_list_of_objects_s3(operation_parameters, days_update: int):
     """
@@ -30,7 +27,7 @@ def get_list_of_objects_s3(operation_parameters, days_update: int):
     page_iterator = paginator.paginate(**operation_parameters)
     for page in page_iterator:
         for content in page.get('Contents'):
-            if content.get('LastModified') > utc.localize(datetime.now() - timedelta(days=days_update)):
+            if content.get('LastModified') > UTC.localize(datetime.now() - timedelta(days=days_update)):
                 yield content.get('Key')
 
 def get_json_s3(bucket, key):
@@ -43,7 +40,11 @@ def get_json_s3(bucket, key):
     data = obj['Body'].read().decode('utf-8')
     return json.loads(data)    
 
-def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: Dict):
+def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: dict):
+    """
+    This functions write pandas dataframe
+    to the table in Glue catalogue
+    """
     try:
         wr.s3.to_parquet(
             df=pandas_df,
@@ -54,10 +55,46 @@ def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: Dict):
             compression='snappy',
             table=glue_parameters['table_name'],
             mode="append",
-            # partition_cols=["coin"],
             use_threads=True,
-            concurrent_partitioning=True,
-            boto3_session=session
+            concurrent_partitioning=True
         )
     except Exception as err:
         print(err)
+
+def lambda_handler(event, context):
+    try:
+        ohlc_parameters = event['ohlc_parameters']
+        tweets_parameters = event['tweets_parameters']
+        days_update = event['days_update']
+        ohlc_glue_parameters = event['ohlc_glue_parameters']
+        tweets_glue_parameters = event['tweets_glue_parameters']
+        logger.info('Fetching OHLC data...')
+        ohlc_data = []
+        for key in get_list_of_objects_s3(ohlc_parameters, days_update):
+            try:
+                if key.endswith('.json'):
+                    coin_currency = re.findall("(?:[0-9]{4}_[0-9]{2}_[0-9]{2})_(.+)(?:.json)", key)[0]
+                    tmp = get_json_s3(BUCKET, key)
+                    res = [dict(item, **{'coin_currency':f'{coin_currency}'}) for item in tmp]
+                    ohlc_data.extend(res)
+            except Exception as err:
+                logging.error(err)
+        if len(ohlc_data) > 0:
+            df = pd.DataFrame(ohlc_data)
+            write_to_glue(df, ohlc_glue_parameters)
+        logger.info('Fetching tweets data...')
+        tweets_data = []
+        for key in get_list_of_objects_s3(tweets_parameters, days_update):
+            try:
+                tmp = get_json_s3(BUCKET, key)
+                tweets_data.extend(tmp)
+            except Exception as err:
+                logging.error(err)
+        if len(tweets_data) > 0:
+            df = pd.DataFrame(tweets_data)
+            write_to_glue(df, tweets_glue_parameters)
+        return True
+    except Exception as err:
+        logger.info(f"FAILED: update of tables wasn not performed")
+        logger.error(err)
+        return False
