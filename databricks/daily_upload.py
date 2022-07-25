@@ -41,7 +41,7 @@ def get_daily_data(coin:str, cur:str) -> List[Dict]:
     try:
         return cryptocompare.get_historical_price_minute(coin, cur)
     except Exception as err:
-        logger.error(err)
+        print(err)
 
 # COMMAND ----------
 

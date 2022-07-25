@@ -7,7 +7,7 @@
 # MAGIC - Get familiar with Databricks platform
 # MAGIC - Explore possibilities of Databricks notrebooks
 # MAGIC - Build a small data lake using *Delta lake* technology
-# MAGIC - Leran how to use different Databricks tools
+# MAGIC - Learn how to use different Databricks tools
 # MAGIC - Analyze the OHLC data regarding the selected cryptocurrencies and associated tweets
 # MAGIC - Try to find some insights
 
@@ -23,7 +23,15 @@
 
 # COMMAND ----------
 
+# MAGIC %lsmagic
+
+# COMMAND ----------
+
 # MAGIC %fs
+
+# COMMAND ----------
+
+dbutils.help()
 
 # COMMAND ----------
 
@@ -78,9 +86,9 @@ print('hello world')
 # MAGIC   + sentimental analysis of tweets (positive, neutral, negative)
 # MAGIC   
 # MAGIC - Data Loading to Delta Tables:
-# MAGIC   + bronze tables for raw data
-# MAGIC   + silver tables for data after transformation
-# MAGIC   + gold table for anaysis
+# MAGIC  + bronze tables for raw data
+# MAGIC  + silver tables for data after transformation
+# MAGIC  + gold table for anaysis
 
 # COMMAND ----------
 
@@ -105,8 +113,6 @@ import tweepy
 import pandas as pd
 from datetime import datetime, timedelta
 from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, ArrayType, TimestampType, DateType
-import pandas as pd
-import numpy as np
 import json
 from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
@@ -193,10 +199,6 @@ coin_info_df = spark.createDataFrame(coin_info.values(), schema=coin_info_schema
 
 # COMMAND ----------
 
-spark.read.table("coin_list").show(1, False, True)
-
-# COMMAND ----------
-
 display(spark.read.table("coin_list"))
 
 # COMMAND ----------
@@ -271,7 +273,8 @@ def get_historical_data(coin:str,
                         cur:str,
                         created_on:dict,
                         schema,
-                        ts=int(datetime.now().timestamp()),
+#                         ts=int(datetime.now().timestamp()),
+                        ts=1657471980,
                         limit=2000):
     data = []
     done = False
@@ -332,7 +335,7 @@ def get_minutes_data(path):
 # COMMAND ----------
 
 minutes_data = get_minutes_data(list_of_pathes)
-display(minutes_data)
+display(minutes_data.sort('time'))
 
 # COMMAND ----------
 
