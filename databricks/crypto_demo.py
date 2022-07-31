@@ -76,19 +76,17 @@ print('hello world')
 # MAGIC %md
 # MAGIC ## Crypto Data + Tweets
 # MAGIC 
-# MAGIC - Data Ingestion:
-# MAGIC   + Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using cryptocompare API
-# MAGIC   + Daily data OHLC data from S3 bucket (15 minutes interval)
-# MAGIC   + Daily tweets from s3 bucket
+# MAGIC - Data **Exrtraction**:
+# MAGIC   - Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using cryptocompare API
+# MAGIC   - Daily data OHLC data from S3 bucket (15 minutes interval)
+# MAGIC   - Daily tweets from s3 bucket
+# MAGIC 
+# MAGIC - Data **Loading** to Delta Tables
+# MAGIC 
+# MAGIC - Data **Transformation**:
+# MAGIC   - OHLC data enrichment
+# MAGIC   - sentimental analysis of tweets (positive, neutral, negative)
 # MAGIC   
-# MAGIC - Data Transformation:
-# MAGIC   + OHLC data enrichment
-# MAGIC   + sentimental analysis of tweets (positive, neutral, negative)
-# MAGIC   
-# MAGIC - Data Loading to Delta Tables:
-# MAGIC  + bronze tables for raw data
-# MAGIC  + silver tables for data after transformation
-# MAGIC  + gold table for anaysis
 
 # COMMAND ----------
 
@@ -101,13 +99,14 @@ import yfinance as yahooFinance
 import pandas as pd
 import datetime
 
-import datetime
 import requests
 import json
 from functools import reduce
 import matplotlib.pyplot as plt
 import numpy as np
 %matplotlib inline
+
+from delta.tables import *
 
 import tweepy
 import pandas as pd
@@ -129,11 +128,15 @@ from sparknlp.pretrained import PretrainedPipeline
 
 # COMMAND ----------
 
-crypto_compare_key = os.getenv("CRYPTO_COMPARE_KEY")
+dbutils.secrets.listScopes()
+
+# COMMAND ----------
+
+crypto_compare_key = dbutils.secrets.getBytes(scope="demo_secrets", key="CRYPTO_COMPARE_KEY").decode("utf-8")
 cryptocompare.cryptocompare._set_api_key_parameter(crypto_compare_key)
 
-access_key = os.getenv("ACCESS_KEY")
-secret_key = os.getenv("SECRET_KEY")
+access_key = dbutils.secrets.getBytes(scope="demo_secrets", key="ACCESS_KEY").decode("utf-8")
+secret_key = dbutils.secrets.getBytes(scope="demo_secrets", key="SECRET_KEY").decode("utf-8")
 encoded_secret_key = secret_key.replace("/", "%2F")
 aws_bucket_name = "databricks-demo-vlad"
 mount_name = "databricks"
@@ -153,8 +156,8 @@ path_to_lake = f"dbfs:/mnt/databricks/{datalake_name}"
 
 #setup twitter
 
-consumer_key = os.getenv("CONSUMER_KEY")
-consumer_secret = os.getenv("CONSUMER_SECRET")
+consumer_key = dbutils.secrets.getBytes(scope="demo_secrets", key="CONSUMER_KEY").decode("utf-8")
+consumer_secret = dbutils.secrets.getBytes(scope="demo_secrets", key="CONSUMER_SECRET").decode("utf-8")
 
 auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
 api = tweepy.API(auth, wait_on_rate_limit=True)
@@ -273,8 +276,7 @@ def get_historical_data(coin:str,
                         cur:str,
                         created_on:dict,
                         schema,
-#                         ts=int(datetime.now().timestamp()),
-                        ts=1657471980,
+                        ts=int(datetime.now().timestamp()),
                         limit=2000):
     data = []
     done = False
@@ -312,6 +314,36 @@ for coin in list_of_coins:
 
 # COMMAND ----------
 
+df = spark.read.table('BRONZE_OHLC_DATA')
+display(df)
+
+# COMMAND ----------
+
+# %sql
+# DESCRIBE HISTORY BRONZE_OHLC_DATA
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC RESTORE TABLE BRONZE_OHLC_DATA TO VERSION AS OF 38
+
+# COMMAND ----------
+
+# %sql
+# -- query to delete duplicates directly from delta lake
+# MERGE INTO BRONZE_OHLC_DATA AS target
+# USING (
+#       WITH t AS(
+#       SELECT *, ROW_NUMBER() OVER (PARTITION BY time, coin_currency ORDER BY time DESC) AS rn FROM BRONZE_OHLC_DATA
+#       )
+#       SELECT * FROM t WHERE rn > 1
+# ) 
+# AS source
+# ON source.time=target.time AND source.coin_currency=target.coin_currency
+# WHEN MATCHED THEN DELETE
+
+# COMMAND ----------
+
 # MAGIC %md ###Daily OHLC data
 
 # COMMAND ----------
@@ -334,17 +366,16 @@ def get_minutes_data(path):
 
 # COMMAND ----------
 
-minutes_data = get_minutes_data(list_of_pathes)
-display(minutes_data.sort('time'))
+per_minute_data = get_minutes_data(list_of_pathes).createOrReplaceTempView('per_minute_data')
 
 # COMMAND ----------
 
-(minutes_data.coalesce(1)
-            .write
-            .format('delta')
-            .mode('append')
-            .saveAsTable("BRONZE_OHLC_DATA")
-            )
+# MAGIC %sql
+# MAGIC MERGE INTO BRONZE_OHLC_DATA AS target
+# MAGIC USING per_minute_data AS source
+# MAGIC ON target.time = source.time AND target.coin_currency = source.coin_currency
+# MAGIC WHEN NOT MATCHED
+# MAGIC   THEN INSERT *
 
 # COMMAND ----------
 
@@ -374,8 +405,17 @@ twitter_schema = StructType(fields=[
 
 # COMMAND ----------
 
-tweets_df = spark.read.json(f"{path_to_lake}/daily_tweets/", schema=twitter_schema).dropDuplicates()
+tweets_df = spark.read.json(f"{path_to_lake}/daily_tweets/", schema=twitter_schema)
 tweets_df.display()
+
+# COMMAND ----------
+
+(tweets_df.coalesce(1)
+            .write
+            .format('delta')
+            .mode('append')
+            .saveAsTable("BRONZE_TWEET_DATA")
+                )
 
 # COMMAND ----------
 
@@ -388,7 +428,6 @@ tweets_df.display()
 # COMMAND ----------
 
 bronze_ohlc = spark.read.table("BRONZE_OHLC_DATA")
-display(bronze_ohlc)
 
 # COMMAND ----------
 
@@ -413,16 +452,26 @@ def bronze_to_silver_ohlc(df):
 # COMMAND ----------
 
 silver_df = bronze_to_silver_ohlc(bronze_ohlc)
-display(silver_df)
+# silver_df.createOrReplaceTempView('tmp_silver')
 
 # COMMAND ----------
 
-(silver_df.coalesce(1)
-            .write
-            .format('delta')
-            .mode('append')
-            .saveAsTable("SILVER_OHLC_DATA")
-            )
+(silver_df
+    .coalesce(1)
+    .write
+    .format('delta')
+    .mode('overwrite')
+    .saveAsTable("SILVER_OHLC_DATA")
+                )
+
+# COMMAND ----------
+
+# %sql
+# MERGE INTO SILVER_OHLC_DATA AS target
+# USING tmp_silver AS source
+# ON source.time_stamp=target.time_stamp AND source.ticker=target.ticker AND source.currency=target.currency
+# WHEN NOT MATCHED
+#   THEN INSERT *
 
 # COMMAND ----------
 
@@ -475,20 +524,28 @@ def bronze_to_silver_tweets(tweets_df):
 # COMMAND ----------
 
 twitter_df_silver = bronze_to_silver_tweets(tweets_df)
+twitter_df_silver.createOrReplaceTempView('tnp_tweets')
+
+# COMMAND ----------
+
 twitter_df_silver.display()
 
 # COMMAND ----------
 
-twitter_df_silver.groupBy('sentiment').count().show()
+(twitter_df_silver
+    .coalesce(1)
+    .write
+    .format('delta')
+    .mode('append')
+    .saveAsTable("silver_twitter_data")
+                )
 
-# COMMAND ----------
-
-(twitter_df_silver.coalesce(1)
-            .write
-            .format('delta')
-            .mode('append')
-            .saveAsTable("SILVER_TWITTER_DATA")
-            )
+# %sql
+# MERGE INTO silver_twitter_data AS target
+# USING tnp_tweets AS source
+# ON source.id=target.id AND source.created_at=target.created_at AND source.ceil_datetime=target.ceil_datetime
+# WHEN NOT MATCHED
+#   THEN INSERT *
 
 # COMMAND ----------
 
@@ -500,7 +557,7 @@ twitter_df_silver.groupBy('sentiment').count().show()
 
 # COMMAND ----------
 
-silver_ohlc = spark.read.table("silver_ohlc_data").dropDuplicates()
+silver_ohlc = spark.read.table("silver_ohlc_data")
 silver_ohlc.createOrReplaceTempView('silver_ohlc')
 
 # COMMAND ----------

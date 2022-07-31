@@ -32,8 +32,8 @@ from pyspark.sql.window import Window
 
 #setup twitter
 
-consumer_key = os.getenv("CONSUMER_KEY")
-consumer_secret = os.getenv("CONSUMER_SECRET")
+consumer_key = dbutils.secrets.getBytes(scope="demo_secrets", key="CONSUMER_KEY").decode("utf-8")
+consumer_secret = dbutils.secrets.getBytes(scope="demo_secrets", key="CONSUMER_SECRET").decode("utf-8")
 
 auth = tweepy.AppAuthHandler(consumer_key, consumer_secret)
 api = tweepy.API(auth, wait_on_rate_limit=True)
@@ -119,12 +119,17 @@ spark_df = sqlContext.read.json(sc.parallelize(get_tweets(tweet_search)), schema
 
 # COMMAND ----------
 
-(spark_df
-    .write
-    .format('delta')
-    .mode('append')
-    .saveAsTable("bronze_tweets_table")
-)
+spark_df.dropDuplicates('id').createOrReplaceTempView('tmp_df')
+spark_df.display()
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC MERGE INTO BRONZE_TWEET_DATA AS target
+# MAGIC USING tmp_df AS source
+# MAGIC ON target.time = source.time AND target.coin_currency = source.coin_currency
+# MAGIC WHEN NOT MATCHED
+# MAGIC   THEN INSERT *
 
 # COMMAND ----------
 

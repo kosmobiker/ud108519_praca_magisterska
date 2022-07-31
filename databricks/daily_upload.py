@@ -6,9 +6,8 @@ import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 import yfinance as yahooFinance
 import pandas as pd
-import datetime
+from datetime import datetime, timedelta
 
-import datetime
 import requests
 import json
 from functools import reduce
@@ -18,8 +17,6 @@ import numpy as np
 
 import tweepy
 import pandas as pd
-from datetime import datetime, timedelta
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, ArrayType, TimestampType, DateType
 import pandas as pd
 import numpy as np
 import json
@@ -28,9 +25,8 @@ from typing import Dict, List
 
 # COMMAND ----------
 
-crypto_compare_key = os.getenv("CRYPTO_COMPARE_KEY")
+crypto_compare_key = dbutils.secrets.getBytes(scope="demo_secrets", key="CRYPTO_COMPARE_KEY").decode("utf-8")
 cryptocompare.cryptocompare._set_api_key_parameter(crypto_compare_key)
-
 
 # COMMAND ----------
 
@@ -84,14 +80,21 @@ for coin in list_of_coins:
             tmp = get_daily_data(coin, currency)
             res = [dict(item, **{'coin_currency':f'{coin}_{currency}'}) for item in tmp]
             data.extend(res)
-spark_df = sqlContext.read.json(sc.parallelize(data), schema=dataframe_schema)
+
 
 # COMMAND ----------
 
-spark_df.write\
-        .format('delta')\
-        .mode('append')\
-        .saveAsTable("bronze_ohlc_data")
+spark_df = sqlContext.read.json(sc.parallelize(data), schema=dataframe_schema)
+spark_df.createOrReplaceTempView('tmp_df')
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC MERGE INTO BRONZE_OHLC_DATA AS target
+# MAGIC USING tmp_df AS source
+# MAGIC ON target.time = source.time AND target.coin_currency = source.coin_currency
+# MAGIC WHEN NOT MATCHED
+# MAGIC   THEN INSERT *
 
 # COMMAND ----------
 
