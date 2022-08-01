@@ -10,6 +10,10 @@
 # MAGIC - Learn how to use different Databricks tools
 # MAGIC - Analyze the OHLC data regarding the selected cryptocurrencies and associated tweets
 # MAGIC - Try to find some insights
+# MAGIC 
+# MAGIC <div>
+# MAGIC <img src="https://geekyblaze.b-cdn.net/f001.backblazeb2.com/file/GeekyNews/Elon-Musk-made-a-typo-and-Twitter-wants-you-to.png" width="700"/>
+# MAGIC </div>
 
 # COMMAND ----------
 
@@ -76,25 +80,33 @@ print('hello world')
 # MAGIC %md
 # MAGIC ## Crypto Data + Tweets
 # MAGIC 
-# MAGIC - Data **Exrtraction**:
-# MAGIC   - Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using cryptocompare API
-# MAGIC   - Daily data OHLC data from S3 bucket (15 minutes interval)
-# MAGIC   - Daily tweets from s3 bucket
+# MAGIC Data **Exrtraction**:
+# MAGIC   - Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using [cryptocompare API](https://min-api.cryptocompare.com/).
+# MAGIC   - Daily data OHLC data from S3 bucket (1 minutes interval)
+# MAGIC   - Daily tweets from S3 bucket
 # MAGIC 
-# MAGIC - Data **Loading** to Delta Tables
+# MAGIC Data **Loading** to Delta Tables
 # MAGIC 
-# MAGIC - Data **Transformation**:
+# MAGIC Data **Transformation**:
 # MAGIC   - OHLC data enrichment
 # MAGIC   - sentimental analysis of tweets (positive, neutral, negative)
-# MAGIC   
+# MAGIC 
+# MAGIC Delta Lake:
+# MAGIC - bronze tables for raw data
+# MAGIC - silver tables for enriched data
+# MAGIC - gold table for merged data prepared for analysis
 
 # COMMAND ----------
 
 import os
 import cryptocompare
-from pyspark.sql.types import *
+
 import pyspark.sql.functions as F
+from pyspark.sql.window import Window
 from pyspark.sql import DataFrame
+from delta.tables import *
+from pyspark.sql.types import *
+
 import yfinance as yahooFinance
 import pandas as pd
 import datetime
@@ -106,17 +118,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 %matplotlib inline
 
-from delta.tables import *
-
 import tweepy
 import pandas as pd
 from datetime import datetime, timedelta
-from pyspark.sql.types import StructType, StructField, StringType, IntegerType, DoubleType, ArrayType, TimestampType, DateType
-import json
 from pyspark.ml import Pipeline
 from pyspark.sql import SparkSession
-import pyspark.sql.functions as F
-from pyspark.sql.window import Window
 from sparknlp.annotator import *
 from sparknlp.base import *
 import sparknlp
@@ -219,13 +225,13 @@ list_of_coins = [
     "SHIB",
     "LTC"
   ]
-list_of_currencies = [
-    "USD",
-    "EUR",
-    "JPY",
-    "BTC"
-  ]
-
+# list_of_currencies = [
+#     "USD",
+#     "EUR",
+#     "JPY",
+#     "BTC"
+#   ]
+list_of_currencies = ['USD']
 created_on = {row['Name']:row['ContentCreatedOn'] for row in df.collect() if row['Name'] in list_of_coins}
 created_on
 
@@ -261,14 +267,6 @@ dataframe_schema = StructType([
 #                 yield y
 # list_of_pathes = [i for i in deep_ls(path_to_daily)]
 # data = []
-# for path in list_of_pathes:
-#     name = path.name[:-5]
-#     path_json = path.path
-#     tmp = spark.read.json(path_json, schema=dataframe_schema)
-#     tmp = tmp.withColumn('coin-currency', F.lit(name))
-#     data.append(tmp)
-# silver_df = reduce(DataFrame.unionAll, data)
-# display(silver_df)
 
 # COMMAND ----------
 
@@ -319,13 +317,14 @@ display(df)
 
 # COMMAND ----------
 
-# %sql
-# DESCRIBE HISTORY BRONZE_OHLC_DATA
+# MAGIC %sql
+# MAGIC DESCRIBE HISTORY BRONZE_OHLC_DATA
 
 # COMMAND ----------
 
-# MAGIC %sql
-# MAGIC RESTORE TABLE BRONZE_OHLC_DATA TO VERSION AS OF 38
+# %sql
+# RESTORE TABLE BRONZE_OHLC_DATA TO VERSION AS OF 38
+
 
 # COMMAND ----------
 
@@ -410,12 +409,13 @@ tweets_df.display()
 
 # COMMAND ----------
 
-(tweets_df.coalesce(1)
-            .write
-            .format('delta')
-            .mode('append')
-            .saveAsTable("BRONZE_TWEET_DATA")
-                )
+(tweets_df
+    .coalesce(1)
+    .write
+    .format('delta')
+    .mode('append')
+    .saveAsTable("BRONZE_TWEET_DATA")
+    )
 
 # COMMAND ----------
 
@@ -427,7 +427,7 @@ tweets_df.display()
 
 # COMMAND ----------
 
-bronze_ohlc = spark.read.table("BRONZE_OHLC_DATA")
+bronze_ohlc = spark.read.table("BRONZE_OHLC_DATA").dropDuplicates(['time', 'coin_currency'])
 
 # COMMAND ----------
 
@@ -479,20 +479,42 @@ silver_df = bronze_to_silver_ohlc(bronze_ohlc)
 
 # COMMAND ----------
 
+tweets_df = spark.read.table('BRONZE_TWEET_DATA')
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC -- query to delete duplicates directly from delta lake
+# MAGIC MERGE INTO BRONZE_TWEET_DATA AS target
+# MAGIC USING (
+# MAGIC       WITH t AS(
+# MAGIC       SELECT *, ROW_NUMBER() OVER (
+# MAGIC           PARTITION BY 'id', created_at, ticker 
+# MAGIC           ORDER BY favorite_count DESC, followers_count DESC, retweet_count DESC) AS rn FROM BRONZE_TWEET_DATA
+# MAGIC       )
+# MAGIC       SELECT * FROM t WHERE rn > 1
+# MAGIC ) 
+# MAGIC AS source
+# MAGIC ON source.id=target.id AND source.created_at=target.created_at AND source.ticker=target.ticker
+# MAGIC WHEN MATCHED THEN DELETE
+
+# COMMAND ----------
+
 spark = sparknlp.start()
 MODEL_NAME='sentimentdl_use_twitter'
 
 # COMMAND ----------
 
 def bronze_to_silver_tweets(tweets_df):
+    #Prepares data into a format that is processable by Spark NLP. This is the entry point for every Spark NLP pipeline.
     documentAssembler = DocumentAssembler()\
             .setInputCol("text")\
             .setOutputCol("document")
-
+    #encodes text into high dimensional vectors
     use = UniversalSentenceEncoder.pretrained(name="tfhub_use", lang="en")\
             .setInputCols(["document"])\
             .setOutputCol("sentence_embeddings")
-
+    #an annotator for multi-class sentiment analysis.
     sentimentdl = SentimentDLModel.pretrained(name=MODEL_NAME, lang="en")\
             .setInputCols(["sentence_embeddings"])\
             .setOutputCol("sentiment")
@@ -524,7 +546,7 @@ def bronze_to_silver_tweets(tweets_df):
 # COMMAND ----------
 
 twitter_df_silver = bronze_to_silver_tweets(tweets_df)
-twitter_df_silver.createOrReplaceTempView('tnp_tweets')
+twitter_df_silver.createOrReplaceTempView('tmp_tweets')
 
 # COMMAND ----------
 
@@ -538,11 +560,11 @@ twitter_df_silver.display()
     .format('delta')
     .mode('append')
     .saveAsTable("silver_twitter_data")
-                )
+    )
 
 # %sql
 # MERGE INTO silver_twitter_data AS target
-# USING tnp_tweets AS source
+# USING tmp_tweets AS source
 # ON source.id=target.id AND source.created_at=target.created_at AND source.ceil_datetime=target.ceil_datetime
 # WHEN NOT MATCHED
 #   THEN INSERT *
@@ -610,7 +632,7 @@ silver_ohlc.createOrReplaceTempView('silver_ohlc')
 # MAGIC   closing_price_weekly
 # MAGIC WHERE
 # MAGIC   ticker = 'ETH'
-# MAGIC   AND currency = 'BTC'
+# MAGIC   AND currency = 'USD'
 
 # COMMAND ----------
 
@@ -618,8 +640,8 @@ df = _sqldf.toPandas()
 
 plt.figure(figsize=(21, 6))
 xs=df['time_period']
-ys=df['closing_price'].astype('float')
-plt.plot(xs, ys, label='ETH/BTC', lw=3, color='navy')
+ys=df['closing_price']
+plt.plot(xs, ys, label='ETH/USD', lw=3, color='navy')
 plt.legend(fontsize=15)
 plt.xlabel('years')
 plt.ylabel('BTC')
@@ -634,14 +656,14 @@ plt.show()
 # MAGIC 
 # MAGIC 
 # MAGIC #transform data
-# MAGIC r_df <- collect(sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'BTC'")) 
+# MAGIC r_df <- collect(sql("SELECT * FROM closing_price_weekly WHERE ticker = 'ETH' AND currency = 'USD'")) 
 # MAGIC 
 # MAGIC #plot itself
 # MAGIC options(repr.plot.width=1200, repr.plot.height=500)
 # MAGIC img1 <- ggplot(data = r_df, aes(x=time_period, y=closing_price)) + 
 # MAGIC                         geom_line(size=1, color='navy') +
-# MAGIC                         ggtitle("ETH/BTC closing prices") +
-# MAGIC                         labs(x = "Date",y = "BTC") +
+# MAGIC                         ggtitle("ETH/USD closing prices") +
+# MAGIC                         labs(x = "Date",y = "USD") +
 # MAGIC                         theme(
 # MAGIC                             plot.margin = margin(0.5, 0.666, 0.45, 1, "cm"),
 # MAGIC                             panel.background = element_rect(fill = "orange"),
@@ -732,6 +754,7 @@ spark.createDataFrame(sp).createOrReplaceTempView('sp_db')
 # MAGIC SELECT *
 # MAGIC FROM highest_daily_returns
 # MAGIC WHERE time_period  > '2022-01-01'
+# MAGIC ORDER BY time_period
 
 # COMMAND ----------
 
@@ -762,8 +785,11 @@ gold_df.display()
 
 # COMMAND ----------
 
-# MAGIC %md Insights
+# MAGIC %md Tweets analysis
 # MAGIC - Net Sentiment by Crypto Ticker and possible correlation
+# MAGIC - Average number of tweets, retweetts, favourites
+# MAGIC - Most Active Twitter User
+# MAGIC - Best & Worst Performing Coin
 
 # COMMAND ----------
 
@@ -810,4 +836,93 @@ gold_df.display()
 
 # COMMAND ----------
 
+# MAGIC %sql
+# MAGIC SELECT
+# MAGIC   QUERY,
+# MAGIC   count(result_type) AS num_recent,
+# MAGIC   avg(favorite_count) AS avg_favorite,
+# MAGIC   avg(followers_count) AS avg_followers,
+# MAGIC   avg(retweet_count) AS avg_retweets
+# MAGIC FROM
+# MAGIC   gold_tmp
+# MAGIC WHERE
+# MAGIC     created_at > '2022-07-10' AND created_at < '2022-07-31'
+# MAGIC GROUP BY
+# MAGIC     QUERY
+# MAGIC ORDER BY
+# MAGIC     avg(retweet_count) DESC
 
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT
+# MAGIC   user_name as top_tweeter,
+# MAGIC   count(id) as tweets
+# MAGIC FROM
+# MAGIC   gold_tmp
+# MAGIC WHERE
+# MAGIC     created_at > '2022-07-10' AND created_at < '2022-07-31'
+# MAGIC GROUP BY
+# MAGIC     user_name
+# MAGIC ORDER BY 
+# MAGIC     tweets DESC
+# MAGIC LIMIT 10
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT
+# MAGIC   QUERY,
+# MAGIC   count(QUERY) as num_tweets
+# MAGIC FROM
+# MAGIC   gold_tmp
+# MAGIC WHERE
+# MAGIC     created_at > '2022-07-10' AND created_at < '2022-07-31'
+# MAGIC GROUP BY
+# MAGIC     QUERY
+# MAGIC ORDER BY
+# MAGIC     num_tweets DESC
+# MAGIC LIMIT 10
+
+# COMMAND ----------
+
+# MAGIC %sql
+# MAGIC SELECT
+# MAGIC   ticker as stock,
+# MAGIC   SUM(delta),
+# MAGIC   min(delta),
+# MAGIC   max(delta)
+# MAGIC FROM
+# MAGIC   gold_tmp
+# MAGIC WHERE
+# MAGIC     created_at > '2022-07-10' AND created_at < '2022-07-31'
+# MAGIC GROUP BY
+# MAGIC     stock
+# MAGIC ORDER BY 
+# MAGIC     SUM(delta) DESC
+# MAGIC LIMIT 15
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC ### Conclusion 
+# MAGIC 
+# MAGIC Our Findings:
+# MAGIC   1. Cryptocoins is still very risky and volatile kind of security in comparison with "traditional" bonds and stocks
+# MAGIC   2. No correlation was found between Twitter activity and coins fluctuation
+# MAGIC   3. Databricks platform was incredibly useful for solving complex problems like merging Twitter and stock data.
+# MAGIC 
+# MAGIC Future improvememnts:
+# MAGIC   1. More data regarding coins and tweets
+# MAGIC   2. Using of paid versions of API
+# MAGIC   3. Automations of adding new data with scheduled jobs
+# MAGIC   4. More complex model for sentimental analysis; using of MLops
+# MAGIC   
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC <div>
+# MAGIC <img src="https://memegenerator.net/img/instances/66665424.jpg" width="700"/>
+# MAGIC </div>
