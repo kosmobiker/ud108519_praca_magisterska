@@ -54,7 +54,8 @@ def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: dict):
             database=glue_parameters['database_name'],
             compression='snappy',
             table=glue_parameters['table_name'],
-            mode="append",
+            mode="overwrite_partitions",
+            partition_cols=["date"] # should be smth like that
             use_threads=True,
             concurrent_partitioning=True
         )
