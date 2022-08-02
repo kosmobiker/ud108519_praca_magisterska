@@ -1,6 +1,7 @@
 import os
 import boto3
 from datetime import datetime, timedelta
+from typing import List
 import logging
 import pandas as pd
 import boto3
@@ -40,7 +41,14 @@ def get_json_s3(bucket, key):
     data = obj['Body'].read().decode('utf-8')
     return json.loads(data)    
 
-def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: dict):
+def write_to_glue(
+    pandas_df: pd.DataFrame,
+    path_table:str,
+    database_name:str,
+    table_name:str,
+    col_partition: List[str],
+    mode='overwrite_partitions'
+        ):
     """
     This functions write pandas dataframe
     to the table in Glue catalogue
@@ -49,18 +57,18 @@ def write_to_glue(pandas_df: pd.DataFrame, glue_parameters: dict):
         wr.s3.to_parquet(
             df=pandas_df,
             index=False,
-            path=glue_parameters['path_table'],
+            path=path_table,
             dataset=True,
-            database=glue_parameters['database_name'],
+            database=database_name,
             compression='snappy',
-            table=glue_parameters['table_name'],
-            mode="overwrite_partitions",
-            partition_cols=["date"] # should be smth like that
+            table=table_name,
+            mode=mode,
+            partition_cols=col_partition,
             use_threads=True,
-            concurrent_partitioning=True
+            concurrent_partitioning=True,
         )
     except Exception as err:
-        print(err)
+        logger.error(err)
 
 def lambda_handler(event, context):
     try:
