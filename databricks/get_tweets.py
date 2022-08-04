@@ -115,11 +115,15 @@ def get_tweets(tweet_search: dict):
 
 # COMMAND ----------
 
-spark_df = sqlContext.read.json(sc.parallelize(get_tweets(tweet_search)), schema=twitter_schema)
+tweet_data = get_tweets(tweet_search)
 
 # COMMAND ----------
 
-spark_df.dropDuplicates('id').createOrReplaceTempView('tmp_df')
+spark_df = sqlContext.read.json(sc.parallelize(tweet_data), schema=twitter_schema)
+
+# COMMAND ----------
+
+spark_df.createOrReplaceTempView('tmp_df')
 spark_df.display()
 
 # COMMAND ----------
