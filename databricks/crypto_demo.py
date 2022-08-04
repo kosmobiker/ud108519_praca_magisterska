@@ -8,7 +8,7 @@
 # MAGIC - Explore possibilities of Databricks notrebooks
 # MAGIC - Build a small data lake using *Delta lake* technology
 # MAGIC - Learn how to use different Databricks tools
-# MAGIC - See how to analyze different types of data like OHLC data regarding the cryptocurrencies and tweets
+# MAGIC - See how to analyze different types of data like OHLC data regarding the cryptocurrencies and "crypto" tweets
 # MAGIC 
 # MAGIC <div>
 # MAGIC <img src="https://geekyblaze.b-cdn.net/f001.backblazeb2.com/file/GeekyNews/Elon-Musk-made-a-typo-and-Twitter-wants-you-to.png" width="700"/>
@@ -912,6 +912,18 @@ gold_df.display()
 # MAGIC ORDER BY 
 # MAGIC     SUM(delta) DESC
 # MAGIC LIMIT 15
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC Not ot forget!
+# MAGIC 
+# MAGIC >export to various formats
+# MAGIC 
+# MAGIC > git commit & push
+# MAGIC 
+# MAGIC change
 
 # COMMAND ----------
 

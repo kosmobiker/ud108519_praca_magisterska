@@ -81,7 +81,7 @@ def get_tweets(tweet_search: dict):
     for key, value in tweet_search.items():
         ticker = key
         query = value
-        for tweet in tweepy.Cursor(api.search_tweets, q=f"{query}", lang="en", result_type='mixed').items(1000):
+        for tweet in tweepy.Cursor(api.search_tweets, q=f"{query}", lang="en", result_type='mixed').items(200):
             new_datetime = datetime.strptime(tweet._json["created_at"],'%a %b %d %H:%M:%S +0000 %Y')
             ceil_datetime = ceil_dt(new_datetime, timedelta(minutes=15))
             month = int(ceil_datetime.strftime("%-m"))
@@ -131,7 +131,7 @@ spark_df.display()
 # MAGIC %sql
 # MAGIC MERGE INTO BRONZE_TWEET_DATA AS target
 # MAGIC USING tmp_df AS source
-# MAGIC ON target.time = source.time AND target.coin_currency = source.coin_currency
+# MAGIC ON source.id=target.id AND source.created_at=target.created_at AND source.ceil_datetime=target.ceil_datetime
 # MAGIC WHEN NOT MATCHED
 # MAGIC   THEN INSERT *
 
