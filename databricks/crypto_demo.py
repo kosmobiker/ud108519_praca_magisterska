@@ -8,8 +8,7 @@
 # MAGIC - Explore possibilities of Databricks notrebooks
 # MAGIC - Build a small data lake using *Delta lake* technology
 # MAGIC - Learn how to use different Databricks tools
-# MAGIC - Analyze the OHLC data regarding the selected cryptocurrencies and associated tweets
-# MAGIC - Try to find some insights
+# MAGIC - See how to analyze different types of data like OHLC data regarding the cryptocurrencies and "crypto" tweets
 # MAGIC 
 # MAGIC <div>
 # MAGIC <img src="https://geekyblaze.b-cdn.net/f001.backblazeb2.com/file/GeekyNews/Elon-Musk-made-a-typo-and-Twitter-wants-you-to.png" width="700"/>
@@ -82,7 +81,7 @@ print('hello world')
 # MAGIC 
 # MAGIC Data **Exrtraction**:
 # MAGIC   - Historical  OHLC (open, high, low, close) data for selected cryptocurrencies (1 hour interval) using [cryptocompare API](https://min-api.cryptocompare.com/).
-# MAGIC   - Daily data OHLC data from S3 bucket (1 minutes interval)
+# MAGIC   - Daily data OHLC data stored in S3 bucket (1 minutes interval) also from [cryptocompare API](https://min-api.cryptocompare.com/).
 # MAGIC   - Daily tweets from S3 bucket
 # MAGIC 
 # MAGIC Data **Loading** to Delta Tables
@@ -225,13 +224,13 @@ list_of_coins = [
     "SHIB",
     "LTC"
   ]
-# list_of_currencies = [
-#     "USD",
-#     "EUR",
-#     "JPY",
-#     "BTC"
-#   ]
-list_of_currencies = ['USD']
+list_of_currencies = [
+    "USD",
+    "EUR",
+    "JPY",
+    "BTC"
+  ]
+# list_of_currencies = ['USD']
 created_on = {row['Name']:row['ContentCreatedOn'] for row in df.collect() if row['Name'] in list_of_coins}
 created_on
 
@@ -404,6 +403,8 @@ twitter_schema = StructType(fields=[
 
 # COMMAND ----------
 
+#round the values up with ceil_datetime function
+
 tweets_df = spark.read.json(f"{path_to_lake}/daily_tweets/", schema=twitter_schema)
 tweets_df.display()
 
@@ -571,6 +572,16 @@ twitter_df_silver.display()
 
 # COMMAND ----------
 
+# MAGIC %md
+# MAGIC 
+# MAGIC >`extra`
+# MAGIC 
+# MAGIC A **job** is a way to run non-interactive code in a Databricks cluster. For example, you can run an extract, transform, and load (ETL) workload interactively or on a schedule. You can also run jobs interactively in the notebook UI.
+# MAGIC 
+# MAGIC **Jobs** are availible in `Workflow` section
+
+# COMMAND ----------
+
 # MAGIC %md ## DATA ANALYSIS
 
 # COMMAND ----------
@@ -586,7 +597,7 @@ silver_ohlc.createOrReplaceTempView('silver_ohlc')
 
 # MAGIC %md Some analysis of the coins
 # MAGIC 
-# MAGIC - How did Etherium price in BTC vary over time?
+# MAGIC - How did Etherium price in USD vary over time?
 # MAGIC - How did Etherium daily returns vary over time? Which days had the worst and best returns?
 # MAGIC - Which cryptocurrencies had the top daily return?
 
@@ -692,7 +703,7 @@ plt.show()
 
 # COMMAND ----------
 
-sp = yahooFinance.Ticker("^GSPC").history(interval='1d', start='2013-06-29', end='2022-07-16')
+sp = yahooFinance.Ticker("^GSPC").history(interval='1d', start='2013-06-29', end='2022-07-25')
 
 sp = sp.resample('1d').ffill()
 sp['daily_factor'] = sp["Close"].pct_change() + 1
@@ -901,6 +912,18 @@ gold_df.display()
 # MAGIC ORDER BY 
 # MAGIC     SUM(delta) DESC
 # MAGIC LIMIT 15
+
+# COMMAND ----------
+
+# MAGIC %md
+# MAGIC 
+# MAGIC Not ot forget!
+# MAGIC 
+# MAGIC >export to various formats
+# MAGIC 
+# MAGIC > git commit & push
+# MAGIC 
+# MAGIC change
 
 # COMMAND ----------
 
