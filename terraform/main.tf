@@ -2,6 +2,22 @@ provider "aws" {
   region = "us-east-1"
   profile = "master"
 }
+variable "glue_database_name"{
+    type    = string
+    default = "darhevich_data_lake"
+}
+variable "glue_coin_info"{
+    type    = string
+    default = "coin_info"
+}
+variable "glue_ohlc_data"{
+    type    = string
+    default = "ohlc_data"
+}
+variable "glue_twitter_data"{
+    type    = string
+    default = "twitter_data"
+}
 
 #Create policy documents for assume role and s3 permissions
 data aws_iam_policy_document lambda_assume_role {
@@ -44,15 +60,7 @@ resource aws_iam_role_policy_attachment lambda_s3 {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_s3.arn
 }
-#lambda functions
-# resource "aws_lambda_function" "coingecko_historical_data" {
-# filename                       = "${path.module}/../src/lambda/my-deployment-package.zip"
-# function_name                  = "coingecko_historical_data"
-# role                           = aws_iam_role.lambda_role.arn
-# handler                        = "lambda_func.lambda_handler"
-# runtime                        = "python3.9"
-# }
-
+#Lambda functions used to fetch data from APIs
 resource "aws_lambda_function" "daily_crypto_data" {
 filename                       = "${path.module}/../src/lambda/daily_crypto_data.zip"
 function_name                  = "daily_crypto_data"
@@ -69,4 +77,167 @@ role                           = aws_iam_role.lambda_role.arn
 handler                        = "get_tweets.lambda_handler"
 runtime                        = "python3.9"
 timeout                        = 600
+}
+
+#Database creation
+resource "aws_glue_catalog_database" "aws_glue_catalog_database" {
+  name          = var.glue_database_name
+  description   = "This database is used to stora data"
+}
+
+#Create table to store info about coins
+resource "aws_glue_catalog_table" "aws_glue_catalog_table_csv" {
+  name          = var.glue_coin_info
+  database_name = var.glue_database_name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    EXTERNAL                 = "TRUE"
+    "classification"         = "csv"
+    "skip.header.line.count" = "1"
+  }
+
+  storage_descriptor {
+    location      = "s3://kosmobiker-masterproject/data/coin_list/table"
+    input_format  = "org.apache.hadoop.mapred.TextInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
+
+    ser_de_info {
+      name                  = "csv-stream"
+      serialization_library = "org.apache.hadoop.hive.serde2.lazy.LazySimpleSerDe"
+
+      parameters = {
+      "separatorChar" = ","
+      "field.delim" = ","
+      }
+    }
+
+columns {
+        name = "Id"
+        type = "bigint"
+      }
+      
+      columns {
+        name = "Url"
+        type = "string"
+      }     
+
+      columns {
+        name = "ImageUrl"
+        type = "string"
+      } 
+
+      columns {
+        name = "ContentCreatedOn"
+        type = "bigint"
+      }    
+
+      columns {
+        name = "Name"
+        type = "string"
+      }
+      
+
+      columns {
+        name = "Symbol"
+        type = "string"
+      }
+
+      columns {
+        name = "CoinName"
+        type = "string"
+      }
+      
+
+      columns {
+        name = "FullName"
+        type = "string"
+      }
+
+      columns {
+        name = "Description"
+        type = "string"
+      }
+      
+      columns {
+        name = "AssetTokenStatus"
+        type = "string"
+      }
+
+      columns {
+        name = "Algorithm"
+        type = "string"
+      }
+
+      columns {
+        name = "ProofType"
+        type = "string"
+      }
+      
+      columns {
+        name = "SortOrder"
+        type = "bigint"
+      }
+      
+      columns {
+        name = "Sponsored"
+        type = "boolean"
+      }
+
+      columns {
+        name = "Taxonomy.Access"
+        type = "string"
+      }
+ 
+      columns {
+        name = "Taxonomy.FCA"
+        type = "string"
+      }
+      
+      columns {
+        name = "Taxonomy.FINMA"
+        type = "string"
+      }
+      
+      columns {
+        name = "Taxonomy.Industry"
+        type = "string"
+      }
+      
+      columns {
+        name = "Taxonomy.CollateralizedAsset"
+        type = "string"
+      }
+
+      columns {
+        name = "Taxonomy.CollateralizedAssetType"
+        type = "string"
+      }
+
+      columns {
+        name = "Taxonomy.CollateralType"
+        type = "string"
+      }
+
+      columns {
+        name = "Taxonomy.CollateralInfo"
+        type = "string"
+      }
+      
+      columns {
+        name = "Rating.Weiss.Rating"
+        type = "string"
+      }
+
+      columns {
+        name = "Rating.Weiss.TechnologyAdoptionRating"
+        type = "string"
+      }
+
+      columns {
+        name = "Rating.Weiss.MarketPerformanceRating"
+        type = "string"
+      }
+  }
 }

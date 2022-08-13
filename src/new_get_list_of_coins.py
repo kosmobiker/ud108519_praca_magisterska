@@ -37,31 +37,32 @@ def get_info_about_coins():
     and asave it as csv file to S3
 
     """
-    pd_data = pd.DataFrame(columns=['Id',
-                                'Url',
-                                'ImageUrl',
-                                'ContentCreatedOn',
-                                'Name',
-                                'Symbol',
-                                'CoinName',
-                                'FullName',
-                                'Description',
-                                'AssetTokenStatus',
-                                'Algorithm',
-                                'ProofType',
-                                'SortOrder',
-                                'Sponsored',
-                                'Taxonomy.Access',
-                                'Taxonomy.FCA',
-                                'Taxonomy.FINMA',
-                                'Taxonomy.Industry',
-                                'Taxonomy.CollateralizedAsset',
-                                'Taxonomy.CollateralizedAssetType',
-                                'Taxonomy.CollateralType',
-                                'Taxonomy.CollateralInfo',
-                                'Rating.Weiss.Rating',
-                                'Rating.Weiss.TechnologyAdoptionRating',
-                                'Rating.Weiss.MarketPerformanceRating'])
+    pd_data = pd.DataFrame(columns=[
+                        'Id',
+                        'Url',
+                        'ImageUrl',
+                        'ContentCreatedOn',
+                        'Name',
+                        'Symbol',
+                        'CoinName',
+                        'FullName',
+                        'Description',
+                        'AssetTokenStatus',
+                        'Algorithm',
+                        'ProofType',
+                        'SortOrder',
+                        'Sponsored',
+                        'Taxonomy.Access',
+                        'Taxonomy.FCA',
+                        'Taxonomy.FINMA',
+                        'Taxonomy.Industry',
+                        'Taxonomy.CollateralizedAsset',
+                        'Taxonomy.CollateralizedAssetType',
+                        'Taxonomy.CollateralType',
+                        'Taxonomy.CollateralInfo',
+                        'Rating.Weiss.Rating',
+                        'Rating.Weiss.TechnologyAdoptionRating',
+                        'Rating.Weiss.MarketPerformanceRating'])
     try:
         create_bucket(AWS_BUCKET, s3_client=s3_client)
         raw_data = cryptocompare.get_coin_list()
@@ -69,8 +70,8 @@ def get_info_about_coins():
             row = pd.json_normalize(raw_data[key])
             pd_data = pd.concat([pd_data, row])
         pd_data = pd_data.reset_index(drop = True)
-        path = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/cryptocompare_list_coins.csv"
-        wr.s3.to_csv(pd_data, path, index=False, boto3_session=session)
+        path = f"s3://{AWS_BUCKET}/{PATH_COIN_LIST}/table/"
+        wr.s3.to_csv(pd_data, path, dataset=True, index=False, boto3_session=session)
         log.info('List of coins was uploaded to data lake')
     except Exception as err:
         log.info('List of coins was not uploaded to data lake')
