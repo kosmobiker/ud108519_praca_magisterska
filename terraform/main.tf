@@ -241,3 +241,77 @@ columns {
       }
   }
 }
+
+#create table to store ohlc data
+resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
+  name          = var.glue_ohlc_data
+  database_name = var.glue_database_name
+
+  table_type = "EXTERNAL_TABLE"
+
+  parameters = {
+    EXTERNAL              = "TRUE"
+    "parquet.compression" = "SNAPPY"
+  }
+
+  partition_keys{
+  	name = "year_month_day"
+  	type = "string"
+  }
+
+  storage_descriptor {
+    location      = "s3://kosmobiker-masterproject/data/ohlc_data"
+    input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
+    output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
+
+    ser_de_info {
+      name                  = "parquet-stream"
+      serialization_library = "org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe"
+
+      parameters = {
+        "serialization.format" = 1
+      }
+    }
+
+    columns {
+      name = "stock_name"
+      type = "string"
+    }
+
+    columns {
+      name    = "formatted_date"
+      type    = "string"
+    }
+
+    columns {
+      name    = "price_start"
+      type    = "double"
+    }
+
+    columns {
+      name    = "price_end"
+      type    = "double"
+    }
+
+    columns {
+      name    = "price_min"
+      type    = "double"
+    }
+
+    columns {
+      name    = "price_max"
+      type    = "double"
+    }
+
+    columns {
+      name    = "volume_sum"
+      type    = "int"
+    }
+    
+    columns {
+      name    = "currency"
+      type    = "string"
+    }
+
+  }
+}
