@@ -61,23 +61,23 @@ resource aws_iam_role_policy_attachment lambda_s3 {
   policy_arn = aws_iam_policy.lambda_s3.arn
 }
 #Lambda functions used to fetch data from APIs
-resource "aws_lambda_function" "daily_crypto_data" {
-filename                       = "${path.module}/../src/lambda/daily_crypto_data.zip"
-function_name                  = "daily_crypto_data"
-role                           = aws_iam_role.lambda_role.arn
-handler                        = "daily_crypto_data.lambda_handler"
-runtime                        = "python3.9"
-timeout                        = 180
-}
+# resource "aws_lambda_function" "daily_crypto_data" {
+# filename                       = "${path.module}/../src/lambda/daily_crypto_data.zip"
+# function_name                  = "daily_crypto_data"
+# role                           = aws_iam_role.lambda_role.arn
+# handler                        = "daily_crypto_data.lambda_handler"
+# runtime                        = "python3.9"
+# timeout                        = 180
+# }
 
-resource "aws_lambda_function" "get_tweets" {
-filename                       = "${path.module}/../src/lambda/get_tweets.zip"
-function_name                  = "get_tweets"
-role                           = aws_iam_role.lambda_role.arn
-handler                        = "get_tweets.lambda_handler"
-runtime                        = "python3.9"
-timeout                        = 600
-}
+# resource "aws_lambda_function" "get_tweets" {
+# filename                       = "${path.module}/../src/lambda/get_tweets.zip"
+# function_name                  = "get_tweets"
+# role                           = aws_iam_role.lambda_role.arn
+# handler                        = "get_tweets.lambda_handler"
+# runtime                        = "python3.9"
+# timeout                        = 600
+# }
 
 #Database creation
 resource "aws_glue_catalog_database" "aws_glue_catalog_database" {
@@ -255,7 +255,7 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
   }
 
   partition_keys{
-  	name = "year_month_day"
+  	name = "partition_col"
   	type = "string"
   }
 
@@ -274,44 +274,84 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
     }
 
     columns {
-      name = "stock_name"
+      name = "ticker"
+      type = "string"
+    }
+    
+    columns {
+      name = "date_time"
       type = "string"
     }
 
     columns {
-      name    = "formatted_date"
-      type    = "string"
+      name = "open"
+      type = "double"
     }
 
     columns {
-      name    = "price_start"
-      type    = "double"
+      name = "high"
+      type = "double"
     }
 
     columns {
-      name    = "price_end"
-      type    = "double"
-    }
-
-    columns {
-      name    = "price_min"
-      type    = "double"
-    }
-
-    columns {
-      name    = "price_max"
-      type    = "double"
-    }
-
-    columns {
-      name    = "volume_sum"
-      type    = "int"
+      name = "low"
+      type = "double"
     }
     
     columns {
-      name    = "currency"
-      type    = "string"
+      name = "close"
+      type = "double"
     }
+    
+    columns {
+      name = "volume_fsym"
+      type = "double"
+    }
+    
+    columns {
+      name = "volume_tsym"
+      type = "double"
+    }
+    
+    columns {
+      name = "currency"
+      type = "string"
+    }
+    
+    columns {
+      name = "delta"
+      type = "double"
+    }
+    
+    columns {
+      name = "time_stamp"
+      type = "bigint"
+    }
+    
+    columns {
+      name = "year"
+      type = "int"
+    }
+    
+    columns {
+      name = "month"
+      type = "int"
+    }
+    
 
+    columns {
+      name = "day"
+      type = "int"
+    }
+    
+    columns {
+      name = "hour"
+      type = "int"
+    }
+    
+    columns {
+      name = "minute"
+      type = "int"
+    }
   }
 }
