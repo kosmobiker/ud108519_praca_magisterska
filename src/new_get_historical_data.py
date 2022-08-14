@@ -93,6 +93,7 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
             'volumeto' : 'volume_tsym',
             'coin' : 'ticker'
             }, axis=1, inplace=True)
+    df = df.drop(['conversion_type', 'conversion_symbol'], axis=1)
     return df
 
 def load(pandas_df: pd.DataFrame, path_table, database_name, table_name, col_partition):
@@ -133,7 +134,7 @@ if __name__ == "__main__":
                     log.debug(f'{coin} {cur} saved in raw format')
                     transformed_df = transform(df)
                     log.debug(f'{coin} {cur} transformed! almost done')
-                    path_parquet = f"s3://{AWS_BUCKET}/{OHLC_PATH}"
+                    path_parquet = f"s3://{AWS_BUCKET}/data/my_database/ohlc_data"
                     load(df, path_parquet, DB_NAME, OHLC_TABLE_NAME, ['partition_col'])
                     log.info(f'{coin} {cur} was uploaded')
                 except Exception as err:

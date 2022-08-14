@@ -82,7 +82,8 @@ resource aws_iam_role_policy_attachment lambda_s3 {
 #Database creation
 resource "aws_glue_catalog_database" "aws_glue_catalog_database" {
   name          = var.glue_database_name
-  description   = "This database is used to stora data"
+  description   = "This database is used to store data"
+  location_uri  = "s3://kosmobiker-masterproject/data/my_database"
 }
 
 #Create table to store info about coins
@@ -99,7 +100,6 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_csv" {
   }
 
   storage_descriptor {
-    location      = "s3://kosmobiker-masterproject/data/coin_list/table"
     input_format  = "org.apache.hadoop.mapred.TextInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.HiveIgnoreKeyTextOutputFormat"
 
@@ -260,7 +260,6 @@ resource "aws_glue_catalog_table" "aws_glue_catalog_table_parquet" {
   }
 
   storage_descriptor {
-    location      = "s3://kosmobiker-masterproject/data/ohlc_data"
     input_format  = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat"
     output_format = "org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat"
 
