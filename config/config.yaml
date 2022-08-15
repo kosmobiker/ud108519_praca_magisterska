@@ -1,8 +1,0 @@
----
-  baseUrl: "https://api.coingecko.com/api/v3/"
-  calls: 50
-  rateLimit: 60
-  path_to_save_historical_data: '../data/historical'
-  path_to_save_data: '../data/detailed'
-  path_to_save_logs: '../logs/'
-  list_of_coins:  ['bitcoin', 'ethereum', 'binance-coin', 'tether', 'solana', 'cardano']
