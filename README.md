@@ -2,7 +2,12 @@
 
 this is a my master thesis repository
 
-This is a for pictures
+***Building a financial Data Lake using cloud computing***
+
+Main idea:
+> gathering data about selected cryptoassets and its mentions in Twitter ans stoting it into the data lake
+
+Aproaches:
 
 1. AWS
 
