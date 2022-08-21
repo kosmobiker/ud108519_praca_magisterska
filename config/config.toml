@@ -5,25 +5,15 @@ name = "Uladzilsau Darhevich"
 dob = 1991-01-28
 
 [dev]
-api_endpoint = "https://api.coingecko.com/api/v3"
-path_coin_list = "data/coin_list/table"
-path_raw_data = "data/raw"
-path_current_data = "data/current_raw"
 path_to_logs = "logs/"
-path_datalake = "data/datalake"
+path_data_lake = "data/my_database"
 db_name = "darhevich_data_lake"
 ohlc_table = "ohlc_data"
 path_raw_hist_data = "data/raw_hist_data"
 ohlc_path = "data/ohlc_data"
 aws_profile = "master"
 aws_bucket = "kosmobiker-masterproject"
-database_name = "master_project"
-historical_table = "historical_data"
 athena_output = "data/athena_tmp"
-chunk_size = 1000
-lambda_func_name = "Kosmo_Test_Lambda_Function"
-schema_name = "u.darhevich-schema"
-schema_version = "0.2-test"
 crypto_compare_key = "6188db038cad874de5eb7da3821490d45967ae07911bb365904d2b1759400ea4"
 list_of_coins = ["BTC", "ETH", "BUSD", "USDT", "XRP", "SOL", "BNB", "DOT", "SHIB", "LTC"]
-list_of_currencies = ['USD', 'BTC']
+list_of_currencies = ['USD', 'BTC', 'EUR', 'JPY']
