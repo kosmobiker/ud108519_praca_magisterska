@@ -2,9 +2,14 @@
 
 this is a my master thesis repository
 
-AWS Architecture:
-![image](https://user-images.githubusercontent.com/49408127/185786210-0ac73fed-d13c-4a0f-ac39-a7cecc5f994b.png)
+This is a for pictures
 
-DataBricks Architecture
-![image](https://user-images.githubusercontent.com/49408127/185786226-a26dc88d-976d-43f2-b196-981dd9a6a1ec.png)
+1. AWS
+
+![image](https://user-images.githubusercontent.com/49408127/185786420-1bae8490-a342-4f25-829e-d3ebdf5f33a3.png)
+
+
+2. DataBricks
+
+![image](https://user-images.githubusercontent.com/49408127/185786433-8599e56c-f2cd-4451-b448-b5d8d1ee191f.png)
 
