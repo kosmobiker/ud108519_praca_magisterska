@@ -6,21 +6,6 @@ import pyspark.sql.functions as F
 from pyspark.sql import DataFrame
 import yfinance as yahooFinance
 import pandas as pd
-from datetime import datetime, timedelta
-
-import requests
-import json
-from functools import reduce
-import matplotlib.pyplot as plt
-import numpy as np
-%matplotlib inline
-
-import tweepy
-import pandas as pd
-import pandas as pd
-import numpy as np
-import json
-
 from typing import Dict, List
 
 # COMMAND ----------

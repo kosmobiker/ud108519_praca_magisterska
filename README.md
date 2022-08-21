@@ -1,22 +1,20 @@
-# sgh-diploma
-this is a my diploma repo
+# SGH master thesis
 
-1. Fetching historical data pipeline
+this is a my master thesis repository
 
-> read_config >> get_hist_data >> save_to_S3 >> validate_data >>
-send_metrics >> transformation >> save_to_parquet
+***Building a financial Data Lake using cloud computing***
 
-2. Fetching current data pipeline
+Main idea:
+> gathering data about selected cryptoassets and its mentions in Twitter ans stoting it into the data lake
 
-> read_config >> get_daily_data >> save_to_S3 >> validate_data >>
-send_metrics >> transformation >> save_to_parquet
+Aproaches:
 
-3. Near Real-time data fetching (one per minute)???
+1. AWS
 
-> read_config >> transform_csv >> visualize
+![image](https://user-images.githubusercontent.com/49408127/185786420-1bae8490-a342-4f25-829e-d3ebdf5f33a3.png)
 
 
+2. DataBricks
 
-
-
+![image](https://user-images.githubusercontent.com/49408127/185786433-8599e56c-f2cd-4451-b448-b5d8d1ee191f.png)
 

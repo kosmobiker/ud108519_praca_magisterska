@@ -3,11 +3,12 @@ this module is used to get historical data for
 selected cryptocurrencies using Cryptocompare API
 with 1 hour interval
 
-Contains 3 steps:
+It consists of 3 steps:
 
 1. Extract - get info from Crytocurrency API
-2. Load - save raw files to S3
-3. Transform - make data dtransformation and upload it to HIVE table
+2. Transform - make data transformation 
+3. Load - upload it to HIVE table
+
 """
 import os
 import boto3
@@ -15,6 +16,7 @@ import cryptocompare
 import pandas as pd
 import awswrangler as wr
 from datetime import datetime
+from typing import List
 from utils.read_config import read_toml_config
 from utils.logger import setup_applevel_logger
 
@@ -23,11 +25,10 @@ ROOT_DIR = os.path.dirname(__file__)
 CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, '..', 'config', 'config.toml'))
 
 config = read_toml_config(CONFIG_PATH)
-CRYPTO_COMPARE_KEY = config['dev']['api_endpoint']
-cryptocompare.cryptocompare._set_api_key_parameter(CRYPTO_COMPARE_KEY)
-PATH_COIN_LIST = config['dev']['path_coin_list']
-PATH_RAW_HIST_DATA = config['dev']['path_raw_hist_data']
+CRYPTO_COMPARE_KEY = config['dev']['crypto_compare_key']
 PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_to_logs']))
+PATH_COIN_LIST = config['dev']['path_coin_list']
+PATH_DATA_LAKE =  config['dev']['path_data_lake']
 OHLC_PATH = config['dev']['ohlc_path']
 OHLC_TABLE_NAME = config['dev']['ohlc_table']
 DB_NAME = config['dev']['db_name']
@@ -38,22 +39,33 @@ LIST_OF_COINS = config['dev']['list_of_coins']
 LIST_OF_CURRENCIES = config['dev']['list_of_currencies']
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
-
+cryptocompare.cryptocompare._set_api_key_parameter(CRYPTO_COMPARE_KEY)
 session = boto3.Session(profile_name=AWS_PROFILE)
 
 #get dates of coin creation
-coin_list = wr.s3.read_csv(f's3://{AWS_BUCKET}/{PATH_COIN_LIST}', boto3_session=session)
+coin_list =wr.s3.read_parquet(f"s3://{AWS_BUCKET}/{PATH_DATA_LAKE}/coin_info", boto3_session=session)
 tmp_df = coin_list[coin_list['Name'].isin(LIST_OF_COINS)][['Name', 'ContentCreatedOn']]
-created_on = dict(zip(tmp_df.Name,tmp_df.ContentCreatedOn))
+created_on = dict(zip(tmp_df.Name, tmp_df.ContentCreatedOn))
 
-#"extract" step
 def extract(coin:str,
             cur:str,
             created_on:dict,
             ts=int(datetime.now().timestamp()),
             limit=2000) -> pd.DataFrame:
-    """
-    there will be some doc strigns
+    """EXTRACT step
+    ===========================================
+    This function extracts raw data from Cryptocompare API
+    and transforms it into Pandas DataFrame
+
+    Args:
+        coin (str): name of the coin
+        cur (str): name of the currency
+        created_on (dict): a dict: where key is a name of cryptocurrency and values is a date of initial release (unix_timestamp) 
+        ts (_type_, optional): date from which the historical data will be obtained. Defaults to current timestamp.
+        limit (int, optional): Number of records obrtained per one call. Defaults to 2000 (max availible value in the free account).
+
+    Returns:
+        pd.DataFrame: DataFame with historical data
     """
     data = []
     done = False
@@ -76,8 +88,16 @@ def extract(coin:str,
 
 
 def transform(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    there will be some doc strigns
+    """TRANSFORM step
+    ===========================================
+    This function transforms the data in DataFrame and returns
+    DataFrame ready for the load
+
+    Args:
+        df (pd.DataFrame): DataFrame with raw historical data
+
+    Returns:
+        pd.DataFrame: DataFrame after transformations
     """
     df['date_time'] = pd.to_datetime(df['time'], unit='s', errors='raise')
     df['year'] = df['date_time'].dt.year
@@ -96,9 +116,21 @@ def transform(df: pd.DataFrame) -> pd.DataFrame:
     df = df.drop(['conversion_type', 'conversion_symbol'], axis=1)
     return df
 
-def load(pandas_df: pd.DataFrame, path_table, database_name, table_name, col_partition):
-    """
-    there will be some doc strigns
+def load(pandas_df: pd.DataFrame,
+        path_table: str,
+        database_name: str,
+        table_name: str,
+        col_partition=None):
+    """LOAD step
+    ===========================================
+    This functions uplaods DataFrame to HIVE table
+
+    Args:
+        pandas_df (pd.DataFrame): DataFrame after transformation step
+        path_table (str): path for the table
+        database_name (str): name of the database
+        table_name (str): name of the table
+        col_partition (_type_, optional): List of column names that will be used to create partitions. Defaults to None.
     """
     try:
         wr.s3.to_parquet(
@@ -120,22 +152,24 @@ def load(pandas_df: pd.DataFrame, path_table, database_name, table_name, col_par
 
 
 if __name__ == "__main__":
-    log.info('starting!')
+    log.info('starting upload the historical data!')
     for coin in LIST_OF_COINS:
         for cur in LIST_OF_CURRENCIES:
             if coin != cur:
                 try:
                     df = extract(coin, cur, created_on)
                     log.debug(f'{coin} {cur} was extracted successful')
-                    path = f's3://{AWS_BUCKET}/{PATH_RAW_HIST_DATA}/{coin}_{cur}_historical'
+                    #save raw historical data without any transformation as csv
+                    path = f's3://{AWS_BUCKET}/raw_hist_data/{coin}_{cur}_historical'
                     wr.s3.to_csv(df, path, index=False,
                                 use_threads=True, boto3_session=session,
                                 dataset=True, mode='overwrite')
-                    log.debug(f'{coin} {cur} saved in raw format')
+                    log.debug(f'{coin} {cur} saved in the raw format')
                     transformed_df = transform(df)
-                    log.debug(f'{coin} {cur} transformed! almost done')
-                    path_parquet = f"s3://{AWS_BUCKET}/data/my_database/ohlc_data"
+                    log.debug(f'{coin} {cur} transformed! Almost done')
+                    path_parquet = f"s3://{AWS_BUCKET}/{PATH_DATA_LAKE}/{OHLC_TABLE_NAME}"
                     load(df, path_parquet, DB_NAME, OHLC_TABLE_NAME, ['partition_col'])
                     log.info(f'{coin} {cur} was uploaded')
                 except Exception as err:
                     log.error(err)
+                    

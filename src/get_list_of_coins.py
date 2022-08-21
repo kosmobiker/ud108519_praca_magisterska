@@ -1,7 +1,7 @@
 """
 This module is used to get basic information about cryptocurrencies
-It uses cryptocompare not coin gecko
-Data is saving as .csv file to S3
+It uses cryptocompare API
+Data is saving HIVE table in database
 """
 import cryptocompare
 import boto3
@@ -21,9 +21,10 @@ CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, '..', 'config', 'config.tom
 
 config = read_toml_config(CONFIG_PATH)
 PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_to_logs']))
-PATH_COIN_LIST = config['dev']['path_coin_list']
+PATH_DATA_LAKE =  config['dev']['path_data_lake']
 AWS_PROFILE = config['dev']['aws_profile']
 AWS_BUCKET = config['dev']['aws_bucket']
+DB_NAME = config['dev']['db_name']
 TODAY = datetime.today().strftime("%Y%m%d")
 
 log = setup_applevel_logger(file_name = PATH_TO_LOGS + "/logging_{}".format(TODAY))
@@ -34,7 +35,7 @@ s3_client = session.client('s3')
 def get_info_about_coins():
     """
     This function is used to get basic information about cryptocurrencies
-    and asave it as csv file to S3
+    and save it as HIVE table
 
     """
     pd_data = pd.DataFrame(columns=[
@@ -70,11 +71,12 @@ def get_info_about_coins():
             row = pd.json_normalize(raw_data[key])
             pd_data = pd.concat([pd_data, row])
         pd_data = pd_data.reset_index(drop = True)
-        path = f"s3://{AWS_BUCKET}/data/my_database/coin_info"
+        path = f"s3://{AWS_BUCKET}/{PATH_DATA_LAKE}/coin_info"
         wr.s3.to_parquet(pd_data, index=False, path=path,
-                    dataset=True, database="darhevich_data_lake",
+                    dataset=True, database=DB_NAME,
                     table="coin_info",
-                    mode="overwrite",boto3_session=session)
+                    mode="overwrite",
+                    boto3_session=session)
         log.info('List of coins was uploaded to data lake')
     except Exception as err:
         log.info('List of coins was not uploaded to data lake')

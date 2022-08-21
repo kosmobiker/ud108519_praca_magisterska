@@ -48,6 +48,53 @@ resource aws_iam_role_policy_attachment lambda_s3 {
   role       = aws_iam_role.lambda_role.name
   policy_arn = aws_iam_policy.lambda_s3.arn
 }
+#glue role
+resource "aws_iam_role" "glue" {
+  name = "AWSGlueServiceRoleDefault"
+  assume_role_policy = <<EOF
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Action": "sts:AssumeRole",
+      "Principal": {
+        "Service": "glue.amazonaws.com"
+      },
+      "Effect": "Allow",
+      "Sid": ""
+    }
+  ]
+}
+EOF
+}
+
+resource "aws_iam_role_policy_attachment" "glue_service" {
+    role = "${aws_iam_role.glue.id}"
+    policy_arn = "arn:aws:iam::aws:policy/service-role/AWSGlueServiceRole"
+}
+
+# If you don't already have a policy, uncomment this section
+resource "aws_iam_role_policy" "my_s3_policy" {
+ name = "my_s3_policy"
+ role = "${aws_iam_role.glue.id}"
+ policy = <<EOF
+{
+ "Version": "2012-10-17",
+ "Statement": [
+   {
+     "Effect": "Allow",
+     "Action": [
+       "s3:*"
+     ],
+     "Resource": [
+      "arn:aws:s3:::kosmobiker-masterproject/*",
+      "arn:aws:logs:*:*:*"
+    ]
+   }
+ ]
+}
+EOF
+}
 #Lambda functions used to fetch data from APIs
 resource "aws_lambda_function" "daily_crypto_data" {
 filename                       = "${path.module}/../src/lambda/daily_crypto_data.zip"
