@@ -134,19 +134,18 @@ list_of_coins = [
     "SHIB",
     "LTC"
   ]
-# list_of_currencies = [
-#     "USD",
-#     "EUR",
-#     "JPY",
-#     "BTC"
-#   ]
-list_of_currencies = ['USD']
+list_of_currencies = [
+    "USD",
+    "EUR",
+    "JPY",
+    "BTC"
+  ]
 created_on = {row['Name']:row['ContentCreatedOn'] for row in df.collect() if row['Name'] in list_of_coins}
 created_on
 
 # COMMAND ----------
 
-list_of_currencies = ["USD", "BTC"]
+list_of_currencies = ["EUR", "JPY"]
 dataframe_schema = StructType([
         StructField("time",LongType(), True),
         StructField("high",DoubleType(),True),
@@ -186,6 +185,7 @@ def get_historical_data(coin:str,
 
 # COMMAND ----------
 
+list_of_currencies = ['BTC']
 for coin in list_of_coins:
     for cur in list_of_currencies:
         if coin != cur:
@@ -369,8 +369,8 @@ output.write\
 
 # COMMAND ----------
 
-silver_ohlc = spark.read.table("silver_ohlc_data")
-silver_tweets = spark.read.table("silver_tweet_data")
+silver_ohlc = spark.read.table("delta_lake.silver_ohlc_data")
+silver_tweets = spark.read.table("delta_lake.silver_tweet_data")
 
 gold_df = silver_tweets.join(
                             silver_ohlc,
@@ -381,16 +381,27 @@ gold_df.write\
         .partitionBy('year')\
         .format('delta')\
         .mode('overwrite')\
-        .saveAsTable("GOLD_TABLE")
+        .saveAsTable("gold_ohlc_tweet_data")
 
 # COMMAND ----------
 
 # MAGIC %sql
-# MAGIC SELECT * FROM GOLD_TABLE
+# MAGIC SELECT * FROM gold_ohlc_tweet_data
 # MAGIC WHERE year = 2022
 # MAGIC ORDER BY created_at DESC
 # MAGIC LIMIT 25
 
 # COMMAND ----------
 
-
+# MAGIC %sql
+# MAGIC -- query to delete duplicates directly from delta lake
+# MAGIC -- MERGE INTO BRONZE_OHLC_DATA AS target
+# MAGIC -- USING (
+# MAGIC --        WITH t AS(
+# MAGIC --        SELECT *, ROW_NUMBER() OVER (PARTITION BY time, coin_currency ORDER BY time DESC) AS rn FROM BRONZE_OHLC_DATA
+# MAGIC --        )
+# MAGIC --        SELECT * FROM t WHERE rn > 1
+# MAGIC --  ) 
+# MAGIC -- AS source
+# MAGIC -- ON source.time=target.time AND source.coin_currency=target.coin_currency
+# MAGIC -- WHEN MATCHED THEN DELETE
