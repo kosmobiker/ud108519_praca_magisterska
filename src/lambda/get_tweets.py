@@ -1,3 +1,8 @@
+"""
+Lambda function to get tweets
+It is invoked by EventBridge trigger each 4 hours
+"""
+
 import tweepy
 import os
 import json
