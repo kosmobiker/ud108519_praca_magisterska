@@ -25,7 +25,7 @@ ROOT_DIR = os.path.dirname(__file__)
 CONFIG_PATH = os.path.abspath(os.path.join(ROOT_DIR, '..', 'config', 'config.toml'))
 
 config = read_toml_config(CONFIG_PATH)
-CRYPTO_COMPARE_KEY = config['dev']['crypto_compare_key']
+CRYPTO_COMPARE_KEY = os.environ['CRYPTO_COMPARE_KEY']
 PATH_TO_LOGS = os.path.abspath(os.path.join(ROOT_DIR, '..', config['dev']['path_to_logs']))
 PATH_COIN_LIST = config['dev']['path_coin_list']
 PATH_DATA_LAKE =  config['dev']['path_data_lake']
